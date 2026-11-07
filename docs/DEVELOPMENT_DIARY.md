@@ -391,3 +391,13 @@
 - Завершить статический аудит переходов уровня, смерти и повторного создания объекта; проверить ванильный cleanup squad и отсутствие companion-only утечек в board/sound manager.
 - После этого вернуться к модели экипировки: цена × состояние — только грубый fallback для оружия; защита костюма/шлема пока эвристическая и требует учёта реальных параметров X-Ray, не только display fields.
 - Только после этого подготовить единый игровой чек-лист главы NPC.
+
+
+### Проверка жизненного цикла пустого squad после смерти последнего NPC
+
+- `sim_squad_scripted:on_npc_death()` при `npc_count() == 0` завершает текущее действие и вызывает `sim_board:remove_squad(self)`.
+- `sim_board:remove_squad()` отвязывает squad от Smart Terrain и вызывает `squad:remove_squad()`.
+- `sim_squad_scripted:remove_squad()` освобождает оставшихся NPC, затем вызывает `hide()`. `hide()` удаляет только map spot; прямой `alife():release(self, true)` для squad закомментирован.
+- `sim_squad_scripted:on_unregister()` очищает `board.squads`, story registry и simulation object registry. В просмотренной цепочке смерти нет явного вызова `release(self)`; не подтверждено, вызывает ли движок unregister автоматически для пустого scripted squad.
+- `sim_squad_scripted:update()` содержит companion guard на `commander_id() == nil`, чтобы пустой squad не продолжал generic A-Life target selection; комментарий указывает на пустой squad после неудачной регистрации NPC. Это подтверждает, что пустые squad-объекты могут встречаться, но не доказывает утечку после смерти.
+- Решение: не добавлять `alife():release(self, true)` без проверки поведения CoP 1.6.02 в игре. Риск — нарушить ванильный lifecycle. Статус: открытый runtime-вопрос, код не менялся.
