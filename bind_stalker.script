@@ -15,6 +15,31 @@ local game_difficulty_by_num = {
 
 local weapon_hide = {}
 local primary_objects_filled = false
+-- GPT AI Companion: choose a nearby reachable level vertex instead of spawning inside the actor.
+local function gpt_companion_spawn_point(actor)
+	local actor_vertex_id = actor:level_vertex_id()
+	local angles = {math.random(50, 60), -math.random(50, 60)}
+
+	for i = 1, 2 do
+		local angle = angles[i] * 0.017453292519943295769236907684886
+		local forward = actor:direction()
+		local cosine = math.cos(angle)
+		local sine = math.sin(angle)
+		local direction = vector():set(
+			forward.x * cosine - forward.z * sine,
+			forward.y,
+			forward.x * sine + forward.z * cosine
+		)
+		local candidate = level.vertex_in_direction(actor_vertex_id, direction, 2.0)
+		if candidate ~= nil and candidate ~= actor_vertex_id and actor:accessible(candidate) == true then
+			return level.vertex_position(candidate), candidate
+		end
+	end
+
+	printf("[GPT_COMPANION] WARNING: no nearby reachable spawn vertex; using actor position")
+	return actor:position(), actor_vertex_id
+end
+
 -- GPT AI Companion: keep the unique NPC inside its own one-member A-Life squad.
 local function ensure_gpt_companion_squad(companion_id, actor)
 	local story_id = "gpt_companion_squad"
@@ -29,12 +54,18 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		end
 	end
 
+	local companion = alife():object(companion_id)
+	if companion == nil then
+		printf("[GPT_COMPANION] ERROR: companion missing while registering squad")
+		return nil
+	end
+
 	if squad == nil then
 		squad = alife():create(
 			"gpt_companion_squad",
-			actor:position(),
-			actor:level_vertex_id(),
-			actor:game_vertex_id()
+			companion.position,
+			companion.m_level_vertex_id,
+			companion.m_game_vertex_id
 		)
 	end
 
@@ -43,15 +74,12 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		return nil
 	end
 
-	local companion = alife():object(companion_id)
-	if companion == nil then
-		printf("[GPT_COMPANION] ERROR: companion missing while registering squad")
-		return nil
-	end
-
-	if companion.group_id ~= squad.id then
+	if companion.group_id == 65535 or companion.group_id == nil then
 		squad:register_member(companion.id)
 		printf("[GPT_COMPANION] Registered companion %s in squad %s", tostring(companion.id), tostring(squad.id))
+	elseif companion.group_id ~= squad.id then
+		printf("[GPT_COMPANION] ERROR: companion %s already belongs to group %s", tostring(companion.id), tostring(companion.group_id))
+		return nil
 	end
 
 	if companion.group_id ~= squad.id then
@@ -83,10 +111,11 @@ local function ensure_gpt_companion_spawned(actor)
 		registry:unregister_by_story_id(story_id)
 	end
 
+	local spawn_position, spawn_vertex_id = gpt_companion_spawn_point(actor)
 	local companion = alife():create(
 		"gpt_companion_main",
-		actor:position(),
-		actor:level_vertex_id(),
+		spawn_position,
+		spawn_vertex_id,
 		actor:game_vertex_id()
 	)
 
