@@ -524,7 +524,25 @@ function check_item(npc, item)
 	if lootable_table[section] == true and gpt_wants_loot_section(section, item) then
 		corpse_contain_any_valuable = true
 	end
+e
+local function gpt_release_selected_corpse(npc, storage)
+	if storage == nil then
+		return
+	end
+
+	local selected_id = storage.selected_corpse_id
+	if selected_id ~= nil then
+		local corpse_storage = db.storage[selected_id]
+		if corpse_storage ~= nil and corpse_storage.corpse_already_selected == npc:id() then
+			corpse_storage.corpse_already_selected = nil
+		end
+	end
+
+	storage.selected_corpse_id = nil
+	storage.vertex_id = nil
+	storage.vertex_position = nil
 end
+nd
 
 ----------------------------------------------------------------------------------------------------------------------
 -- EVALUATORS
@@ -602,10 +620,7 @@ function evaluator_corpse:evaluate()
 	-- Global loot state must never leak into another NPC's corpse evaluation.
 	gpt_end_loot_context()
 	if not scan_ok then
-		if self.a.selected_corpse_id ~= nil and db.storage[self.a.selected_corpse_id] ~= nil then
-			db.storage[self.a.selected_corpse_id].corpse_already_selected = nil
-		end
-		self.a.selected_corpse_id = nil
+		gpt_release_selected_corpse(self.object, self.a)
 		printf("[GPT_COMPANION] Corpse scan failed: %s", tostring(scan_error))
 		return false
 	end
@@ -614,9 +629,7 @@ function evaluator_corpse:evaluate()
 		self.a.vertex_position = nearest_corpse_position
 		
 		if self.a.selected_corpse_id ~= nil and self.a.selected_corpse_id ~= corpse_id then
-			if db.storage[self.a.selected_corpse_id] ~= nil then
-				db.storage[self.a.selected_corpse_id].corpse_already_selected = nil
-			end			
+			gpt_release_selected_corpse(self.object, self.a)
 		end
 
 		self.a.selected_corpse_id = corpse_id
@@ -657,10 +670,7 @@ function action_search_corpse:execute ()
 	xr_sound.set_sound_play(self.object:id(), "corpse_loot_begin")
 end
 function action_search_corpse:finalize ()
-	if self.a.selected_corpse_id ~= nil and db.storage[self.a.selected_corpse_id] ~= nil then 
-		db.storage[self.a.selected_corpse_id].corpse_already_selected = nil
-	end
-	
+	gpt_release_selected_corpse(self.object, self.a)
 	action_base.finalize(self)
 end
 
