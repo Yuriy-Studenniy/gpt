@@ -327,7 +327,11 @@ local function gpt_wants_ammo(section)
 	end
 
 	gpt_loot_ammo_needed = false
-	gpt_loot_target:iterate_inventory(gpt_check_weapon_ammo, section)
+	-- iterate_inventory's second argument is a game_object context, not user data.
+	-- Capture the requested ammo section in a closure instead.
+	gpt_loot_target:iterate_inventory(function(owner, item)
+		gpt_check_weapon_ammo(section, item)
+	end, gpt_loot_target)
 	return gpt_loot_ammo_needed
 end
 
