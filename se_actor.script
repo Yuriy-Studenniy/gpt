@@ -36,7 +36,7 @@ end
 --------------------
 function se_actor:STATE_Read(packet, size)
 	cse_alife_creature_actor.STATE_Read(self, packet, size)
-	-- под LevelEditor не пытаться читать из пакета ничего
+	-- ГЇГ®Г¤ LevelEditor Г­ГҐ ГЇГ»ГІГ ГІГјГ±Гї Г·ГЁГІГ ГІГј ГЁГ§ ГЇГ ГЄГҐГІГ  Г­ГЁГ·ГҐГЈГ®
 	if editor() then
 		return
 	end
@@ -56,22 +56,22 @@ end
 --*										SIMULATION_TARGET_ACTOR									*
 --***********************************************************************************************
 
--- Получить позицию, левел вертекс, гейм вертекс обьекта.
+-- ГЏГ®Г«ГіГ·ГЁГІГј ГЇГ®Г§ГЁГ¶ГЁГѕ, Г«ГҐГўГҐГ« ГўГҐГ°ГІГҐГЄГ±, ГЈГҐГ©Г¬ ГўГҐГ°ГІГҐГЄГ± Г®ГЎГјГҐГЄГІГ .
 function se_actor:get_location()
 	return self.position, self.m_level_vertex_id, self.m_game_vertex_id
 end
 
--- Достигнут ли я отрядом выбравшим меня как цель.
+-- Г„Г®Г±ГІГЁГЈГ­ГіГІ Г«ГЁ Гї Г®ГІГ°ГїГ¤Г®Г¬ ГўГ»ГЎГ°Г ГўГёГЁГ¬ Г¬ГҐГ­Гї ГЄГ ГЄ Г¶ГҐГ«Гј.
 function se_actor:am_i_reached(squad)
 	return not level.object_by_id(self.id):alive()
 end
 
--- Вызывается 1 раз после достижения меня отрядом выбравшим меня как цель.
+-- Г‚Г»Г§Г»ГўГ ГҐГІГ±Гї 1 Г°Г Г§ ГЇГ®Г±Г«ГҐ Г¤Г®Г±ГІГЁГ¦ГҐГ­ГЁГї Г¬ГҐГ­Гї Г®ГІГ°ГїГ¤Г®Г¬ ГўГ»ГЎГ°Г ГўГёГЁГ¬ Г¬ГҐГ­Гї ГЄГ ГЄ Г¶ГҐГ«Гј.
 function se_actor:on_after_reach(squad)
 	--squad.current_target_id = squad.smart_id
 end
 
--- Вызывается 1 раз в момент выбора меня как цели.
+-- Г‚Г»Г§Г»ГўГ ГҐГІГ±Гї 1 Г°Г Г§ Гў Г¬Г®Г¬ГҐГ­ГІ ГўГ»ГЎГ®Г°Г  Г¬ГҐГ­Гї ГЄГ ГЄ Г¶ГҐГ«ГЁ.
 function se_actor:on_reach_target(squad)
 	squad:set_location_types()
 	for k in squad:squad_members() do
@@ -81,7 +81,7 @@ function se_actor:on_reach_target(squad)
 	end
 	sim_board.get_sim_board():assign_squad_to_smart(squad, nil)
 end
--- Возвращает CALifeSmartTerrainTask на меня, вызывается из smart_terrain:task()
+-- Г‚Г®Г§ГўГ°Г Г№Г ГҐГІ CALifeSmartTerrainTask Г­Г  Г¬ГҐГ­Гї, ГўГ»Г§Г»ГўГ ГҐГІГ±Гї ГЁГ§ smart_terrain:task()
 function se_actor:get_alife_task()
 	printf("Returning alife task for object [%s] game_vertex [%s] level_vertex [%s] position %s", self.id, self.m_game_vertex_id, self.m_level_vertex_id, vec_to_str(self.position))
 	return CALifeSmartTerrainTask(self.m_game_vertex_id, self.m_level_vertex_id)
@@ -94,7 +94,7 @@ local smarts_by_no_assault_zones = {
 }
 
 function se_actor:sim_available()
-	-- Проверить не находится ли игрок ближе чем 50 метров к смарту закрытому для симуляции.
+	-- ГЏГ°Г®ГўГҐГ°ГЁГІГј Г­ГҐ Г­Г ГµГ®Г¤ГЁГІГ±Гї Г«ГЁ ГЁГЈГ°Г®ГЄ ГЎГ«ГЁГ¦ГҐ Г·ГҐГ¬ 50 Г¬ГҐГІГ°Г®Гў ГЄ Г±Г¬Г Г°ГІГі Г§Г ГЄГ°Г»ГІГ®Г¬Гі Г¤Г«Гї Г±ГЁГ¬ГіГ«ГїГ¶ГЁГЁ.
 	if smart_terrain.nearest_to_actor_smart.dist < 50
 		and simulation_objects.get_sim_obj_registry().objects[smart_terrain.nearest_to_actor_smart.id] == nil then
 		return false
@@ -108,7 +108,7 @@ function se_actor:sim_available()
 			end
 		end
 	end
-	-- Проверить не находится ли игрок в сейфрестрикторе смарта во время тревоги.
+	-- ГЏГ°Г®ГўГҐГ°ГЁГІГј Г­ГҐ Г­Г ГµГ®Г¤ГЁГІГ±Гї Г«ГЁ ГЁГЈГ°Г®ГЄ Гў Г±ГҐГ©ГґГ°ГҐГ±ГІГ°ГЁГЄГІГ®Г°ГҐ Г±Г¬Г Г°ГІГ  ГўГ® ГўГ°ГҐГ¬Гї ГІГ°ГҐГўГ®ГЈГЁ.
 	if smart_terrain_control.current_smart_id == nil then
 		return true
 	end
@@ -131,8 +131,11 @@ local is_squad_monster =
 	["monster_special"] = true
 }
 
--- Мой прекондишн.
+-- ГЊГ®Г© ГЇГ°ГҐГЄГ®Г­Г¤ГЁГёГ­.
 function se_actor:target_precondition(squad)
+	if squad.gpt_companion then
+		return true
+	end
 	local squad_params = sim_board.simulation_activities[squad.player_id]
 	if squad_params == nil or squad_params.actor == nil or squad_params.actor.prec(squad, self) == false then
 		return false
@@ -150,7 +153,7 @@ function se_actor:target_precondition(squad)
 ]]
 end
 
--- Посчитать мой приоритет для отряда.
+-- ГЏГ®Г±Г·ГЁГІГ ГІГј Г¬Г®Г© ГЇГ°ГЁГ®Г°ГЁГІГҐГІ Г¤Г«Гї Г®ГІГ°ГїГ¤Г .
 function se_actor:evaluate_prior(squad)
 	return simulation_objects.evaluate_prior(self, squad)
 end
