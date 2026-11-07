@@ -122,6 +122,17 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		return nil, "squad_relation_failed"
 	end
 
+	-- Mirror sim_board:create_squad(): initialize the member's Team/Squad/Group
+	-- fields after registration so the custom one-member squad follows the same
+	-- bookkeeping path as vanilla-created squads.
+	local member_setup_ok, member_setup_error = pcall(function()
+		squad.board:setup_squad_and_group(companion)
+	end)
+	if not member_setup_ok then
+		printf("[GPT_COMPANION] ERROR: squad member setup failed: %s", tostring(member_setup_error))
+		return nil, "squad_member_setup_failed"
+	end
+
 	-- Sound registration is auxiliary: it must not invalidate a working A-Life squad.
 	local sound_ok, sound_error = pcall(function()
 		local sound_registered = false
