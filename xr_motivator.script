@@ -33,8 +33,9 @@ local function gpt_consume_companion_item(npc, section, need_key, relief)
 		-- Bring both needs and their game-time baseline up to date before
 		-- applying food relief, so elapsed time is not counted twice later.
 		local squad = get_object_squad(npc)
-		if squad ~= nil and squad.gpt_companion == true then
-			gpt_companion_update_needs(squad)
+		if squad ~= nil and squad.gpt_companion == true
+			and type(gpt_companion_update_needs) == "function" then
+			gpt_companion_update_needs(squad, true)
 		end
 
 		local need = xr_logic.pstor_retrieve(db.actor, need_key, 0)
