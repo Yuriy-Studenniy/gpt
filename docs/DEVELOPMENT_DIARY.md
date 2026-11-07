@@ -233,3 +233,15 @@
 - `0105a1ce7789db1c3744558b339e86ca79fd518e` — Retry companion initialization after transient failures.
 - `ac7f6376b2b47dd1269441ae771f71a2354340ba` — Confirm squad membership and protect setup retries.
 
+
+
+## 2026-11-08 — Освобождение corpse reservation при прекращении поиска
+
+- Увидел дополнительный путь, по которому бронь трупа могла оставаться активной до финализатора: evaluator возвращал `false` при смерти NPC, появлении врага, zombied-состоянии, выключенной схеме, ранении, actor-section guard или отсутствии доступного трупа. Теперь перед такими отказами вызывается `gpt_release_selected_corpse()`.
+- Если callback `get_all_from_corpse()` обнаруживает, что выбранный corpse уже исчез/не имеет online object, он также освобождает собственную бронь и очищает выбранные координаты.
+- При Lua-ошибке во время фактического переноса предметов после очистки loot context тоже освобождается бронь; частичный уже выполненный перенос не откатывается.
+- В helper действует ownership check: очистка поля corpse storage выполняется только когда owner id всё ещё совпадает с текущим NPC.
+- Коммит: `3bfd40a9a1704207dff4c3e46ffcc3bfb93d0a89` — Release corpse reservations when search becomes invalid.
+- Дополнительная очистка после exception при переносе: `1bab5eab421ac457786e01895788cebc107c4eef` — Release corpse reservation after failed loot transfer.
+- Остался открытым runtime-вопрос о том, гарантирует ли action planner вызов `finalize()` при смерти/прерывании. Новые пути очистки уменьшают зависимость от этого, но не доказывают все возможные lifecycle-переходы.
+
