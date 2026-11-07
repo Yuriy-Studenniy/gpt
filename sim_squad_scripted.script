@@ -7,6 +7,97 @@
 --'******************************************************
 local squad_behaviour_ini 	= ini_file("misc\\squad_behaviours.ltx")
 local locations_ini			= ini_file("misc\\smart_terrain_masks.ltx")
+
+-- GPT AI Companion: needs are stored on the always-present actor so they
+-- survive the companion switching between online and offline A-Life states.
+local GPT_HUNGER_PER_GAME_MINUTE = 0.18
+local GPT_THIRST_PER_GAME_MINUTE = 0.30
+
+local function gpt_clamp_need(value)
+	if value < 0 then
+		return 0
+	end
+	if value > 100 then
+		return 100
+	end
+	return value
+end
+
+function gpt_companion_update_needs(squad)
+	local actor = db.actor
+	if actor == nil or db.storage[actor:id()] == nil then
+		return
+	end
+
+	local hunger = xr_logic.pstor_retrieve(actor, "gpt_need_hunger", nil)
+	local thirst = xr_logic.pstor_retrieve(actor, "gpt_need_thirst", nil)
+
+	-- Migrate values from the first prototype, which stored them on the NPC.
+	if hunger == nil or thirst == nil then
+		for member in squad:squad_members() do
+			local member_storage = db.storage[member.id]
+			if member_storage ~= nil and member_storage.pstor ~= nil then
+				if hunger == nil then
+					hunger = member_storage.pstor.gpt_need_hunger
+				end
+				if thirst == nil then
+					thirst = member_storage.pstor.gpt_need_thirst
+				end
+			end
+		end
+	end
+	if hunger == nil then hunger = 0 end
+	if thirst == nil then thirst = 0 end
+
+	local current_time = game.get_game_time()
+	local year, month, day, hour, minute, second, millisecond = 0, 0, 0, 0, 0, 0, 0
+	year, month, day, hour, minute, second, millisecond =
+		current_time:get(year, month, day, hour, minute, second, millisecond)
+
+	local previous_year = xr_logic.pstor_retrieve(actor, "gpt_need_time_year", nil)
+	if previous_year ~= nil then
+		local previous_time = game.CTime()
+		previous_time:set(
+			previous_year,
+			xr_logic.pstor_retrieve(actor, "gpt_need_time_month", 1),
+			xr_logic.pstor_retrieve(actor, "gpt_need_time_day", 1),
+			xr_logic.pstor_retrieve(actor, "gpt_need_time_hour", 0),
+			xr_logic.pstor_retrieve(actor, "gpt_need_time_minute", 0),
+			xr_logic.pstor_retrieve(actor, "gpt_need_time_second", 0),
+			xr_logic.pstor_retrieve(actor, "gpt_need_time_ms", 0)
+		)
+
+		local elapsed_seconds = current_time:diffSec(previous_time)
+		if elapsed_seconds > 0 then
+			local elapsed_minutes = elapsed_seconds / 60
+			hunger = gpt_clamp_need(hunger + GPT_HUNGER_PER_GAME_MINUTE * elapsed_minutes)
+			thirst = gpt_clamp_need(thirst + GPT_THIRST_PER_GAME_MINUTE * elapsed_minutes)
+		end
+	end
+
+	xr_logic.pstor_store(actor, "gpt_need_hunger", hunger)
+	xr_logic.pstor_store(actor, "gpt_need_thirst", thirst)
+	xr_logic.pstor_store(actor, "gpt_need_time_year", year)
+	xr_logic.pstor_store(actor, "gpt_need_time_month", month)
+	xr_logic.pstor_store(actor, "gpt_need_time_day", day)
+	xr_logic.pstor_store(actor, "gpt_need_time_hour", hour)
+	xr_logic.pstor_store(actor, "gpt_need_time_minute", minute)
+	xr_logic.pstor_store(actor, "gpt_need_time_second", second)
+	xr_logic.pstor_store(actor, "gpt_need_time_ms", millisecond)
+end
+
+function gpt_companion_get_needs()
+	local actor = db.actor
+	if actor == nil or db.storage[actor:id()] == nil then
+		return nil
+	end
+
+	return {
+		hunger = xr_logic.pstor_retrieve(actor, "gpt_need_hunger", 0),
+		thirst = xr_logic.pstor_retrieve(actor, "gpt_need_thirst", 0)
+	}
+end
+
 --function printf()
 --end
 
@@ -162,6 +253,16 @@ end
 function sim_squad_scripted:update()
 	cse_alife_online_offline_group.update (self)
 	self:refresh()
+
+	-- The squad keeps ticking needs even while its only member is offline.
+	if self.gpt_companion == true then
+		local current_tick = time_global()
+		if self.gpt_needs_last_tick == nil or current_tick - self.gpt_needs_last_tick >= 60000 then
+			gpt_companion_update_needs(self)
+			self.gpt_needs_last_tick = current_tick
+		end
+	end
+
 
 	-- Àïäåéò äîñòóïíîñòè äëÿ ñèìóëÿöèè.
 	simulation_objects.get_sim_obj_registry():update_avaliability(self)
