@@ -757,7 +757,7 @@ function get_item(npc, item)
 		end
 
 		if transfer_confirmed then
-			gpt_mark_loot_taken(section, item)
+			gpt_mark_loot_taken(section, equipment_group)
 		else
 			printf("[GPT_COMPANION] Item transfer was not confirmed for %s", section)
 		end
