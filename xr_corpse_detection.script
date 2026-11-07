@@ -524,7 +524,8 @@ function check_item(npc, item)
 	if lootable_table[section] == true and gpt_wants_loot_section(section, item) then
 		corpse_contain_any_valuable = true
 	end
-e
+end
+
 local function gpt_release_selected_corpse(npc, storage)
 	if storage == nil then
 		return
@@ -542,7 +543,6 @@ local function gpt_release_selected_corpse(npc, storage)
 	storage.vertex_id = nil
 	storage.vertex_position = nil
 end
-nd
 
 ----------------------------------------------------------------------------------------------------------------------
 -- EVALUATORS
