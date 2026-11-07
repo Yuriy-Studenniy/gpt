@@ -159,7 +159,7 @@ function select_position(npc, st)
 	local actor = db.actor
 
 	-- ïðîâåðÿåì òî÷êó ñëåâà îò àêòåðà
-	desired_direction = vector_rotate_y(actor:direction(), math.random(50,60) )
+	local desired_direction = vector_rotate_y(actor:direction(), math.random(50,60) )
 	node_1_vertex_id = level.vertex_in_direction(actor:level_vertex_id(),
 		desired_direction,
 		desired_distance)
