@@ -14,36 +14,68 @@ net_spawn
 -- GPT AI Companion: consume supplies only when the corresponding need is high.
 -- The engine applies the item's normal eat/boost effects; the companion's
 -- abstract hunger/thirst values are adjusted separately and saved on the actor.
+local function gpt_count_companion_inventory_section(npc, section)
+	local count = 0
+	npc:iterate_inventory(function(owner, item)
+		if item:section() == section then
+			count = count + 1
+		end
+	end, npc)
+	return count
+end
+
 local function gpt_consume_companion_item(npc, section, need_key, relief)
 	local item = npc:object(section)
 	if item == nil then
 		return false
 	end
 
-	-- eat() is exposed as a void script call, so verify the eatable's
-	-- remaining portions before treating the action as successful.
-	local ok_before, uses_before = pcall(function()
+	-- get_remaining_uses() is an OpenXRay extension and is not part of
+	-- the original CoP 1.6.02 Lua export list. Use it when available, but
+	-- retain a vanilla-compatible confirmation path based on inventory count.
+	local uses_supported = false
+	local uses_before = nil
+	local ok_before, value_before = pcall(function()
 		return item:get_remaining_uses()
 	end)
-	if not ok_before or type(uses_before) ~= "number" or uses_before <= 0 then
-		printf("[GPT_COMPANION] Cannot verify remaining uses for %s", section)
+	if ok_before and type(value_before) == "number" and value_before > 0 then
+		uses_supported = true
+		uses_before = value_before
+	end
+
+	local item_count_before = gpt_count_companion_inventory_section(npc, section)
+	if item_count_before <= 0 then
 		return false
 	end
 
-	local item_id = item:id()
 	npc:eat(item)
 
-	local ok_after, uses_after = pcall(function()
-		return item:get_remaining_uses()
-	end)
-	if not ok_after or type(uses_after) ~= "number" or uses_after >= uses_before then
+	local consumed = false
+	if uses_supported then
+		local ok_after, uses_after = pcall(function()
+			return item:get_remaining_uses()
+		end)
+		if ok_after and type(uses_after) == "number" and uses_after < uses_before then
+			consumed = true
+		end
+	end
+
+	-- Vanilla CoP food/drink items are ordinary consumables: the engine
+	-- removes the item after use. A reduced section count confirms that
+	-- path without relying on an OpenXRay-only getter. For custom
+	-- multi-use items, this fallback deliberately does not guess.
+	local item_count_after = gpt_count_companion_inventory_section(npc, section)
+	if item_count_after < item_count_before then
+		consumed = true
+	end
+
+	if not consumed then
 		printf("[GPT_COMPANION] Eat was not confirmed for %s", section)
 		return false
 	end
 
 	-- The engine handles empty-item removal through its inventory drop
-	-- pipeline (CEatableItem -> SetDropManual -> ownership reject).
-	-- Do not release the same object from A-Life here.
+	-- pipeline. Do not release the same object from A-Life here.
 
 	if db.actor ~= nil and db.storage[db.actor:id()] ~= nil then
 		-- Bring both needs and their game-time baseline up to date before
