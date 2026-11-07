@@ -490,3 +490,13 @@
 - В просмотренном X-Ray 1.6.02-derived `CWeapon::GetSuitableAmmoTotal()` возвращает `iAmmoElapsed` плюс сумму всех подходящих типов патронов из belt и ruck. `GetAmmoElapsed()` возвращает количество патронов в текущем магазине. Следовательно, `get_ammo_total() - get_ammo_in_magazine()` корректно даёт запас compatible rounds вне магазина.
 - `gpt_check_weapon_ammo()` отдельно проверяет, входит ли запрашиваемая секция в `ammo_class` конкретного оружия, а target reserve вычисляет из `ammo_mag_size` (2 магазина с clamp 4..120). По одному трупу принимается максимум одна коробка каждого ammo section через `gpt_loot_ammo_taken`.
 - Вывод: API-семантика текущего расчёта reserve подтверждена; исправление не требуется. Это статическая сверка исходника/привязок, не проверка фактической добычи в игре.
+
+
+### Заключительный статический аудит главы 1 — 2026-11-08
+
+- Сверен не только status/checklist, но и целевые конфиги: `gpt_companion_main` присутствует в `spawn_sections_general.ltx`, `character_desc_general.xml` и `npc_profile.xml`; companion scheme `xr_companion` подключена через `modules.script`; squad section задаёт один persistent member и флаг `gpt_companion`.
+- По согласованному объёму главы 1 не обнаружена полностью отсутствующая базовая подсистема: spawn/Story ID/A-Life, follow/combat/wounded, стартовый набор, corpse loot/transfer/reservation, equipment/ammo, needs/time/PSTOR, обычные NPC isolation имеют соответствующие ветви или конфигурации.
+- Найдена несогласованность: companion стартует с 3 бинтами и loot whitelist берёт бинты, но `xr_wounded.script` использует только medkit path, а `xr_motivator.script` не употребляет bandage. Бинты пока не являются рабочей частью лечения.
+- Thirst снижает только `energy_drink`; в начальном комплекте напитка нет. Это минимальный hydration proxy, не полноценная вода.
+- Loot whitelist включает уникальные варианты предметов и не использует универсальную quest-aware проверку. Нельзя без теста утверждать, что любые сюжетно значимые предметы гарантированно защищены от подбора.
+- Добавлен `docs/CHAPTER_1_FINAL_AUDIT.md`; обновлены status и единый in-game checklist. Игровой код не менялся. Итог остаётся статическим: Lua compile и CoP runtime не запускались.
