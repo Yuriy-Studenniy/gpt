@@ -92,6 +92,8 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		return nil
 	end
 
+	squad:set_squad_relation()
+
 	local sound_registered = false
 	for _, entry in pairs(squad.sound_manager.npc) do
 		if entry.npc_id == companion.id then
