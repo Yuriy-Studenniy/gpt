@@ -86,7 +86,9 @@ end
 
 function evaluate_prior(target, squad)
 	local prior = 0
-	if not target:target_precondition(squad) or not is_on_the_same_level(target, squad) then
+	local same_level = is_on_the_same_level(target, squad)
+	local companion_following_actor = squad.player_id == "gpt_companion" and target:clsid() == clsid.script_actor
+	if not target:target_precondition(squad) or (not same_level and not companion_following_actor) then
 		return prior
 	else
 		prior = 3
