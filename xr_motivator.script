@@ -48,7 +48,13 @@ local function gpt_consume_companion_item(npc, section, need_name, relief)
 		return false
 	end
 
-	npc:eat(item)
+	local eat_ok, eat_error = pcall(function()
+		npc:eat(item)
+	end)
+	if not eat_ok then
+		printf("[GPT_COMPANION] Eat call failed for %s: %s", section, tostring(eat_error))
+		return false
+	end
 
 	local consumed = false
 	if uses_supported then
