@@ -720,8 +720,12 @@ function get_all_from_corpse(npc)
 
 	transfer_to_npc = npc
 	gpt_begin_loot_context(npc)
-	gpt_loot_equipment_candidates = {}
-	corpse_npc:iterate_inventory(gpt_select_best_equipment, corpse_npc)
+	-- The quality-based two-pass selection is exclusive to our companion.
+	-- Other NPCs retain the original one-pass vanilla loot transfer.
+	if gpt_loot_target ~= nil then
+		gpt_loot_equipment_candidates = {}
+		corpse_npc:iterate_inventory(gpt_select_best_equipment, corpse_npc)
+	end
 	corpse_npc:iterate_inventory(get_item, corpse_npc)
 	gpt_end_loot_context()
 	transfer_to_npc = nil
