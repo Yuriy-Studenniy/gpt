@@ -10,6 +10,79 @@ net_spawn
 
 
 ----------------------------------------------------------------------------------------------------------------------
+
+-- GPT AI Companion: consume supplies only when the corresponding need is high.
+-- The engine applies the item's normal eat/boost effects; the companion's
+-- abstract hunger/thirst values are adjusted separately and saved on the actor.
+local function gpt_consume_companion_item(npc, section, need_key, relief)
+	local item = npc:object(section)
+	if item == nil then
+		return false
+	end
+
+	local item_id = item:id()
+	npc:eat(item)
+
+	-- Food items are real inventory objects, unlike the temporary medkit_script.
+	local server_item = alife():object(item_id)
+	if server_item ~= nil then
+		alife():release(server_item, true)
+	end
+
+	if db.actor ~= nil and db.storage[db.actor:id()] ~= nil then
+		local need = xr_logic.pstor_retrieve(db.actor, need_key, 0)
+		local remaining = need - relief
+		if remaining < 0 then
+			remaining = 0
+		end
+		xr_logic.pstor_store(db.actor, need_key, remaining)
+	end
+
+	printf("[GPT_COMPANION] Consumed %s for %s", section, need_key)
+	return true
+end
+
+local function gpt_try_companion_consumption(npc)
+	if npc == nil or npc:alive() ~= true then
+		return false
+	end
+
+	-- Never interrupt combat or movement through an immediate danger.
+	if npc:best_enemy() ~= nil or npc:best_danger() ~= nil then
+		return false
+	end
+
+	if db.actor == nil or db.storage[db.actor:id()] == nil then
+		return false
+	end
+
+	local hunger = xr_logic.pstor_retrieve(db.actor, "gpt_need_hunger", 0)
+	local thirst = xr_logic.pstor_retrieve(db.actor, "gpt_need_thirst", 0)
+
+	if hunger >= 55 then
+		-- CoP food saturation: bread is weaker than sausage and canned food.
+		if gpt_consume_companion_item(npc, "bread", "gpt_need_hunger", 60) then
+			return true
+		end
+		if gpt_consume_companion_item(npc, "kolbasa", "gpt_need_hunger", 100) then
+			return true
+		end
+		if gpt_consume_companion_item(npc, "conserva", "gpt_need_hunger", 100) then
+			return true
+		end
+	end
+
+	if thirst >= 55 then
+		-- Vanilla energy drinks do not have a thirst stat; this is the
+		-- companion's own hydration rule for the only non-alcoholic drink.
+		if gpt_consume_companion_item(npc, "energy_drink", "gpt_need_thirst", 60) then
+			return true
+		end
+	end
+
+	return false
+end
+
 class "motivator_binder" (object_binder)
 
 function motivator_binder:__init (obj) super(obj)
@@ -361,6 +434,16 @@ function motivator_binder:update(delta)
 	local object = self.object
 	local object_alive = object:alive()
 	local actor = db.actor
+
+	-- GPT AI Companion: check food and drink needs periodically while online.
+	if object_alive and get_object_story_id(object:id()) == "gpt_companion_main" then
+		local consume_now = time_global()
+		if self.gpt_companion_consumption_last_update == nil
+			or consume_now - self.gpt_companion_consumption_last_update >= 15000 then
+			gpt_try_companion_consumption(object)
+			self.gpt_companion_consumption_last_update = consume_now
+		end
+	end
 
 	-- Ïåðåêëþ÷åíèå ëîãèêè.
 	update_logic(object)
