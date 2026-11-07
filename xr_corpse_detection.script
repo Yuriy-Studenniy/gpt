@@ -718,6 +718,14 @@ function get_item(npc, item)
 		return
 	end
 
+	-- Keep the original vanilla path completely separate from companion scoring.
+	if gpt_loot_target == nil then
+		if gpt_wants_loot_section(section, item) then
+			npc:transfer_item(item, transfer_to_npc)
+		end
+		return
+	end
+
 	local equipment_group = gpt_get_equipment_profile(item)
 	if gpt_loot_equipment_candidates ~= nil then
 		if equipment_group ~= nil then
@@ -734,12 +742,6 @@ function get_item(npc, item)
 	end
 
 	if gpt_wants_loot_section(section, item) then
-		if gpt_loot_target == nil then
-			-- Keep the vanilla one-pass transfer path for every other NPC.
-			npc:transfer_item(item, transfer_to_npc)
-			return
-		end
-
 		local target_id = transfer_to_npc:id()
 		npc:transfer_item(item, transfer_to_npc)
 
@@ -763,7 +765,6 @@ function get_item(npc, item)
 		end
 	end
 end
-
 function get_all_from_corpse(npc)
 	printf("GET ALL FROM CORPSE")
 
