@@ -71,9 +71,7 @@ function gpt_companion_update_needs(squad, force_update)
 	-- Migrate values from the first prototype, which stored them on the NPC.
 	if (hunger == nil or thirst == nil) and squad ~= nil then
 		for member in squad:squad_members() do
-			-- Vanilla sim_board exposes the ALife object through member.object.
-			local member_object = member and member.object
-			local member_storage = member_object ~= nil and db.storage[member_object.id]
+			local member_storage = db.storage[member.id]
 			if member_storage ~= nil and member_storage.pstor ~= nil then
 				if hunger == nil then
 					hunger = member_storage.pstor.gpt_need_hunger
