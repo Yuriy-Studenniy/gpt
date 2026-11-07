@@ -18,9 +18,9 @@ local primary_objects_filled = false
 -- GPT AI Companion: choose a nearby reachable level vertex instead of spawning inside the actor.
 local function gpt_companion_spawn_point(actor)
 	local actor_vertex_id = actor:level_vertex_id()
-	local angles = {math.random(50, 60), -math.random(50, 60)}
+	local angles = {45, -45, 90, -90, 135, -135}
 
-	for i = 1, 2 do
+	for i = 1, #angles do
 		local angle = angles[i] * 0.017453292519943295769236907684886
 		local forward = actor:direction()
 		local cosine = math.cos(angle)
@@ -40,7 +40,7 @@ local function gpt_companion_spawn_point(actor)
 	return actor:position(), actor_vertex_id
 end
 
--- GPT AI Companion: keep the unique NPC inside its own one-member A-Life squad.
+
 local function ensure_gpt_companion_squad(companion_id, actor)
 	local story_id = "gpt_companion_squad"
 	local registry = get_story_objects_registry()
