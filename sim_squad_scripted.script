@@ -33,7 +33,7 @@ function gpt_companion_update_needs(squad, force_update)
 	local thirst = xr_logic.pstor_retrieve(actor, "gpt_need_thirst", nil)
 
 	-- Migrate values from the first prototype, which stored them on the NPC.
-	if hunger == nil or thirst == nil then
+	if (hunger == nil or thirst == nil) and squad ~= nil then
 		for member in squad:squad_members() do
 			local member_storage = db.storage[member.id]
 			if member_storage ~= nil and member_storage.pstor ~= nil then
