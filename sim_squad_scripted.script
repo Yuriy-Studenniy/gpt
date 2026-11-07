@@ -23,7 +23,7 @@ local function gpt_clamp_need(value)
 	return value
 end
 
-function gpt_companion_update_needs(squad)
+function gpt_companion_update_needs(squad, force_update)
 	local actor = db.actor
 	if actor == nil or db.storage[actor:id()] == nil then
 		return
@@ -84,7 +84,7 @@ function gpt_companion_update_needs(squad)
 	if elapsed_seconds < 0 then
 		-- A clock reset should not decrease needs or create negative time.
 		elapsed_seconds = 0
-	elseif elapsed_seconds < 60 then
+	elseif elapsed_seconds < 60 and force_update ~= true then
 		-- Avoid writing the actor's save data on every simulation update.
 		return
 	end
