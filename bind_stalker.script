@@ -15,6 +15,53 @@ local game_difficulty_by_num = {
 
 local weapon_hide = {}
 local primary_objects_filled = false
+-- GPT AI Companion: keep the unique NPC inside its own one-member A-Life squad.
+local function ensure_gpt_companion_squad(companion_id, actor)
+	local story_id = "gpt_companion_squad"
+	local registry = get_story_objects_registry()
+	local existing_id = registry:get(story_id)
+	local squad = nil
+
+	if existing_id ~= nil then
+		squad = alife():object(existing_id)
+		if squad == nil then
+			registry:unregister_by_story_id(story_id)
+		end
+	end
+
+	if squad == nil then
+		squad = alife():create(
+			"gpt_companion_squad",
+			actor:position(),
+			actor:level_vertex_id(),
+			actor:game_vertex_id()
+		)
+	end
+
+	if squad == nil then
+		printf("[GPT_COMPANION] ERROR: squad creation returned nil")
+		return nil
+	end
+
+	local companion = alife():object(companion_id)
+	if companion == nil then
+		printf("[GPT_COMPANION] ERROR: companion missing while registering squad")
+		return nil
+	end
+
+	if companion.group_id ~= squad.id then
+		squad:register_member(companion.id)
+		printf("[GPT_COMPANION] Registered companion %s in squad %s", tostring(companion.id), tostring(squad.id))
+	end
+
+	if not squad.gpt_companion_sound_registered then
+		squad.sound_manager:register_npc(companion.id)
+		squad.gpt_companion_sound_registered = true
+	end
+
+	return squad.id
+end
+
 -- GPT AI Companion: create the unique stalker once, then reuse the saved A-Life object.
 local function ensure_gpt_companion_spawned(actor)
 	local story_id = "gpt_companion_main"
@@ -25,6 +72,7 @@ local function ensure_gpt_companion_spawned(actor)
 		local existing_object = alife():object(existing_id)
 		if existing_object ~= nil then
 			printf("[GPT_COMPANION] Existing companion found: id=%s", tostring(existing_id))
+			ensure_gpt_companion_squad(existing_id, actor)
 			return existing_id
 		end
 		registry:unregister_by_story_id(story_id)
@@ -43,6 +91,7 @@ local function ensure_gpt_companion_spawned(actor)
 	end
 
 	printf("[GPT_COMPANION] Created unique companion: id=%s", tostring(companion.id))
+	ensure_gpt_companion_squad(companion.id, actor)
 	return companion.id
 end
 
