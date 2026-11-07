@@ -41,6 +41,7 @@ end
 --' Èíèöèàëèçàöèÿ
 function sim_squad_scripted:init_squad()
 	self.player_id 			= utils.cfg_get_string(sim_board.squad_ltx, self.settings_id, "faction", self, true, "")
+	self.gpt_companion = utils.cfg_get_bool(sim_board.squad_ltx, self.settings_id, "gpt_companion", self, false)
 	self.action_condlist	= xr_logic.parse_condlist(self, "assign_action", "target_smart", utils.cfg_get_string(sim_board.squad_ltx, self.settings_id, "target_smart", self, false, "", ""))
 	self.death_condlist		= xr_logic.parse_condlist(self, "death_condlist", "on_death", utils.cfg_get_string(sim_board.squad_ltx, self.settings_id, "on_death", self, false, "", ""))
 	self.invulnerability	= xr_logic.parse_condlist(self, "invulnerability", "invulnerability", utils.cfg_get_string(sim_board.squad_ltx, self.settings_id, "invulnerability", self, false, "", ""))
@@ -693,9 +694,12 @@ function sim_squad_scripted:has_detector()
 end
 
 function sim_squad_scripted:get_squad_community()
-	if self.player_id == "gpt_companion" then
-		return "stalker"
+	local squad_community = squad_community_by_behaviour[self.player_id]
+	if squad_community == nil then
+		abort("squad community is 'nil' for player_id [%s]", self.player_id)
 	end
+	return squad_community
+end
 	local squad_community = squad_community_by_behaviour[self.player_id]
 	if squad_community == nil then
 		abort("squad community is 'nil' for player_id [%s]", self.player_id)
