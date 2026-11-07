@@ -487,7 +487,7 @@ local function gpt_wants_loot_section(section, item)
 	return true
 end
 
-local function gpt_mark_loot_taken(section, equipment_group)
+local function gpt_mark_loot_taken(section, item)
 	if gpt_loot_counts == nil then
 		return
 	end
@@ -630,14 +630,13 @@ function evaluator_corpse:evaluate()
 		return false
 	end
 	if nearest_corpse_vertex ~= nil then
-		self.a.vertex_id = nearest_corpse_vertex
-		self.a.vertex_position = nearest_corpse_position
-		
 		if self.a.selected_corpse_id ~= nil and self.a.selected_corpse_id ~= corpse_id then
 			gpt_release_selected_corpse(self.object, self.a)
 		end
 
 		self.a.selected_corpse_id = corpse_id
+		self.a.vertex_id = nearest_corpse_vertex
+		self.a.vertex_position = nearest_corpse_position
 		db.storage[self.a.selected_corpse_id].corpse_already_selected = self.object:id()		
 		
 		return true
