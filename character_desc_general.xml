@@ -6565,9 +6565,10 @@
 			wpn_pm = 1 \n
 			ammo_9x18_fmj = 2 \n
 			wpn_knife = 1 \n
+			stalker_outfit = 1 \n
 			device_torch = 1 \n
-			bandage = 2 \n
-			medkit = 1 \n
+			bandage = 3 \n
+			medkit = 2 \n
 			bread = 1 \n
 			conserva = 1 \n
 		</supplies>
