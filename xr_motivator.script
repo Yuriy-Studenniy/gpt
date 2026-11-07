@@ -33,8 +33,7 @@ local function gpt_consume_companion_item(npc, section, need_key, relief)
 		-- Bring both needs and their game-time baseline up to date before
 		-- applying food relief, so elapsed time is not counted twice later.
 		local squad = get_object_squad(npc)
-		if squad ~= nil and squad.gpt_companion == true
-			and type(gpt_companion_update_needs) == "function" then
+		if type(gpt_companion_update_needs) == "function" then
 			gpt_companion_update_needs(squad, true)
 		end
 
@@ -85,8 +84,8 @@ local function gpt_try_companion_consumption(npc)
 	end
 
 	if thirst >= 55 then
-		-- Vanilla energy drinks do not have a thirst stat; this is the
-		-- companion's own hydration rule for the only non-alcoholic drink.
+		-- The energy drink is a mod-side hydration proxy; vanilla item
+		-- effects remain unchanged.
 		if gpt_consume_companion_item(npc, "energy_drink", "gpt_need_thirst", 60) then
 			return true
 		end
