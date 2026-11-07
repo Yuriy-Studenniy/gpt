@@ -542,6 +542,45 @@ function check_item(npc, item)
 	end
 end
 
+local function gpt_is_corpse_reservation_active(corpse_id)
+	local corpse_storage = db.storage[corpse_id]
+	if corpse_storage == nil then
+		return false
+	end
+
+	local owner_id = corpse_storage.corpse_already_selected
+	if owner_id == nil then
+		return false
+	end
+
+	local owner_storage = db.storage[owner_id]
+	local owner_detection = owner_storage and owner_storage.corpse_detection
+	if owner_detection == nil or owner_detection.selected_corpse_id ~= corpse_id then
+		corpse_storage.corpse_already_selected = nil
+		return false
+	end
+
+	local object_ok, owner_object = pcall(function()
+		return level.object_by_id(owner_id)
+	end)
+	if not object_ok or owner_object == nil then
+		-- Offline NPCs cannot currently execute the corpse-search action.
+		corpse_storage.corpse_already_selected = nil
+		return false
+	end
+
+	local state_ok, owner_alive, searching = pcall(function()
+		return owner_object:alive(), is_under_corpse_detection(owner_object)
+	end)
+	if not state_ok or owner_alive ~= true or searching ~= true then
+		-- The owner died or switched away from the corpse-search action.
+		corpse_storage.corpse_already_selected = nil
+		return false
+	end
+
+	return true
+end
+
 local function gpt_release_selected_corpse(npc, storage)
 	if storage == nil then
 		return
@@ -609,9 +648,12 @@ function evaluator_corpse:evaluate()
 		gpt_begin_loot_context(self.object)
 		for k,v in pairs(corpses) do
 			local id = v.id
-			local corpse_npc = db.storage[id] and db.storage[id].object
+			local corpse_storage = db.storage[id]
+			local corpse_npc = corpse_storage and corpse_storage.object
+			local reservation_active = gpt_is_corpse_reservation_active(id)
+			local reservation_owner = corpse_storage and corpse_storage.corpse_already_selected
 	
-			if corpse_npc ~= nil and self.object:see(corpse_npc) and (db.storage[id].corpse_already_selected == nil or db.storage[id].corpse_already_selected == self.object:id()) then
+			if corpse_npc ~= nil and self.object:see(corpse_npc) and (not reservation_active or reservation_owner == self.object:id()) then
 				if self.object:position():distance_to_sqr(corpse_npc:position()) < nearest_corpse_dist then
 	
 					corpse_contain_any_valuable = nil
@@ -883,4 +925,8 @@ function is_under_corpse_detection(npc)
 
 	local current_action_id = mgr:current_action_id() 
 	return  current_action_id == xr_actions_id.corpse_exist
+end
+
+function is_corpse_reservation_active(corpse_id)
+	return gpt_is_corpse_reservation_active(corpse_id)
 end
