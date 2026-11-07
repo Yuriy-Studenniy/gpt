@@ -153,6 +153,45 @@ local gpt_loot_target = nil
 local gpt_loot_counts = nil
 local gpt_loot_needs = nil
 
+local gpt_loot_ammo_taken = nil
+local gpt_loot_ammo_needed = false
+
+local function gpt_check_weapon_ammo(wanted_section, item)
+	if not isWeapon(item) then
+		return
+	end
+
+	local weapon_section = item:section()
+	local ini = system_ini()
+	if not ini:line_exist(weapon_section, "ammo_class") then
+		return
+	end
+
+	local ammo_text = ini:r_string(weapon_section, "ammo_class")
+	local ammo_sections = utils.parse_names(ammo_text)
+	for i = 1, #ammo_sections do
+		if ammo_sections[i] == wanted_section then
+			local total_ammo = item:get_ammo_total()
+			local magazine_ammo = item:get_ammo_in_magazine()
+			local reserve_ammo = total_ammo - magazine_ammo
+			if reserve_ammo < 60 then
+				gpt_loot_ammo_needed = true
+			end
+			return
+		end
+	end
+end
+
+local function gpt_wants_ammo(section)
+	if gpt_loot_ammo_taken == nil or gpt_loot_ammo_taken[section] == true then
+		return false
+	end
+
+	gpt_loot_ammo_needed = false
+	gpt_loot_target:iterate_inventory(gpt_check_weapon_ammo, section)
+	return gpt_loot_ammo_needed
+end
+
 local gpt_food_sections = {
 	["bread"] = true,
 	["kolbasa"] = true,
@@ -192,6 +231,7 @@ local function gpt_begin_loot_context(npc)
 
 	gpt_loot_target = npc
 	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, bandages = 0}
+	gpt_loot_ammo_taken = {}
 	npc:iterate_inventory(gpt_count_loot_inventory, npc)
 
 	local hunger = 0
@@ -212,6 +252,7 @@ local function gpt_end_loot_context()
 	gpt_loot_target = nil
 	gpt_loot_counts = nil
 	gpt_loot_needs = nil
+	gpt_loot_ammo_taken = nil
 end
 
 local function gpt_wants_loot_section(section)
@@ -247,6 +288,10 @@ local function gpt_wants_loot_section(section)
 		return gpt_loot_counts.bandages < 2
 	end
 
+	if string.sub(section, 1, 5) == "ammo_" then
+		return gpt_wants_ammo(section)
+	end
+
 	-- Avoid carrying exact duplicate weapons, attachments, suits, helmets and detectors.
 	if string.sub(section, 1, 4) == "wpn_"
 		or string.sub(section, 1, 5) == "helm_"
@@ -261,6 +306,10 @@ end
 local function gpt_mark_loot_taken(section)
 	if gpt_loot_counts == nil then
 		return
+	end
+
+	if string.sub(section, 1, 5) == "ammo_" and gpt_loot_ammo_taken ~= nil then
+		gpt_loot_ammo_taken[section] = true
 	end
 
 	if gpt_food_sections[section] then
