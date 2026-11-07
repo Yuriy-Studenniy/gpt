@@ -41,14 +41,9 @@ local function gpt_consume_companion_item(npc, section, need_key, relief)
 		return false
 	end
 
-	-- Keep multi-portion food in the inventory. Release the server object
-	-- only when the engine confirms that its last portion was consumed.
-	if uses_after <= 0 then
-		local server_item = alife():object(item_id)
-		if server_item ~= nil then
-			alife():release(server_item, true)
-		end
-	end
+	-- The engine handles empty-item removal through its inventory drop
+	-- pipeline (CEatableItem -> SetDropManual -> ownership reject).
+	-- Do not release the same object from A-Life here.
 
 	if db.actor ~= nil and db.storage[db.actor:id()] ~= nil then
 		-- Bring both needs and their game-time baseline up to date before
