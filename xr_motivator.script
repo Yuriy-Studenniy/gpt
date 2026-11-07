@@ -10,6 +10,41 @@ net_spawn
 
 
 ----------------------------------------------------------------------------------------------------------------------
+-- GPT AI Companion: persistent abstract hunger and thirst levels.
+-- This first layer tracks needs only; consumption decisions are added separately.
+local GPT_HUNGER_PER_MINUTE = 0.18
+local GPT_THIRST_PER_MINUTE = 0.30
+
+local function gpt_clamp_need(value)
+	if value < 0 then
+		return 0
+	end
+	if value > 100 then
+		return 100
+	end
+	return value
+end
+
+local function gpt_update_companion_needs(npc, elapsed_minutes)
+	if npc == nil or elapsed_minutes == nil or elapsed_minutes <= 0 then
+		return
+	end
+
+	local storage = db.storage[npc:id()]
+	if storage == nil then
+		return
+	end
+
+	local hunger = xr_logic.pstor_retrieve(npc, "gpt_need_hunger", 0)
+	local thirst = xr_logic.pstor_retrieve(npc, "gpt_need_thirst", 0)
+
+	hunger = gpt_clamp_need(hunger + GPT_HUNGER_PER_MINUTE * elapsed_minutes)
+	thirst = gpt_clamp_need(thirst + GPT_THIRST_PER_MINUTE * elapsed_minutes)
+
+	xr_logic.pstor_store(npc, "gpt_need_hunger", hunger)
+	xr_logic.pstor_store(npc, "gpt_need_thirst", thirst)
+end
+
 class "motivator_binder" (object_binder)
 
 function motivator_binder:__init (obj) super(obj)
@@ -368,7 +403,7 @@ function motivator_binder:update(delta)
 		local needs_now = time_global()
 		local elapsed_ms = needs_now - self.gpt_companion_needs_last_update
 		if elapsed_ms >= 60000 then
-			gpt_companion_needs.update(object, elapsed_ms / 60000)
+			gpt_update_companion_needs(object, elapsed_ms / 60000)
 			self.gpt_companion_needs_last_update = needs_now
 		end
 	end
