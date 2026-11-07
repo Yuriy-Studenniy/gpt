@@ -23,14 +23,50 @@ local function gpt_clamp_need(value)
 	return value
 end
 
+-- Character-state interface. The current persistence backend is the actor's
+-- save-backed PSTOR, but callers must not know or depend on that implementation.
+local GPT_NEED_STORAGE_KEYS = {
+	hunger = "gpt_need_hunger",
+	thirst = "gpt_need_thirst"
+}
+
+function gpt_companion_get_need(need_name, default_value)
+	local storage_key = GPT_NEED_STORAGE_KEYS[need_name]
+	if storage_key == nil then
+		return default_value
+	end
+
+	local actor = db.actor
+	if actor == nil or db.storage[actor:id()] == nil then
+		return default_value
+	end
+
+	return xr_logic.pstor_retrieve(actor, storage_key, default_value)
+end
+
+function gpt_companion_set_need(need_name, value)
+	local storage_key = GPT_NEED_STORAGE_KEYS[need_name]
+	if storage_key == nil or type(value) ~= "number" then
+		return false
+	end
+
+	local actor = db.actor
+	if actor == nil or db.storage[actor:id()] == nil then
+		return false
+	end
+
+	xr_logic.pstor_store(actor, storage_key, gpt_clamp_need(value))
+	return true
+end
+
 function gpt_companion_update_needs(squad, force_update)
 	local actor = db.actor
 	if actor == nil or db.storage[actor:id()] == nil then
 		return
 	end
 
-	local hunger = xr_logic.pstor_retrieve(actor, "gpt_need_hunger", nil)
-	local thirst = xr_logic.pstor_retrieve(actor, "gpt_need_thirst", nil)
+	local hunger = gpt_companion_get_need("hunger", nil)
+	local thirst = gpt_companion_get_need("thirst", nil)
 
 	-- Migrate values from the first prototype, which stored them on the NPC.
 	if (hunger == nil or thirst == nil) and squad ~= nil then
@@ -57,8 +93,8 @@ function gpt_companion_update_needs(squad, force_update)
 	local previous_year = xr_logic.pstor_retrieve(actor, "gpt_need_time_year", nil)
 	if previous_year == nil then
 		-- Establish a baseline for a new game or a save without need history.
-		xr_logic.pstor_store(actor, "gpt_need_hunger", hunger)
-		xr_logic.pstor_store(actor, "gpt_need_thirst", thirst)
+		gpt_companion_set_need("hunger", hunger)
+		gpt_companion_set_need("thirst", thirst)
 		xr_logic.pstor_store(actor, "gpt_need_time_year", year)
 		xr_logic.pstor_store(actor, "gpt_need_time_month", month)
 		xr_logic.pstor_store(actor, "gpt_need_time_day", day)
@@ -93,8 +129,8 @@ function gpt_companion_update_needs(squad, force_update)
 	hunger = gpt_clamp_need(hunger + GPT_HUNGER_PER_GAME_MINUTE * elapsed_minutes)
 	thirst = gpt_clamp_need(thirst + GPT_THIRST_PER_GAME_MINUTE * elapsed_minutes)
 
-	xr_logic.pstor_store(actor, "gpt_need_hunger", hunger)
-	xr_logic.pstor_store(actor, "gpt_need_thirst", thirst)
+	gpt_companion_set_need("hunger", hunger)
+	gpt_companion_set_need("thirst", thirst)
 	xr_logic.pstor_store(actor, "gpt_need_time_year", year)
 	xr_logic.pstor_store(actor, "gpt_need_time_month", month)
 	xr_logic.pstor_store(actor, "gpt_need_time_day", day)
@@ -111,8 +147,8 @@ function gpt_companion_get_needs()
 	end
 
 	return {
-		hunger = xr_logic.pstor_retrieve(actor, "gpt_need_hunger", 0),
-		thirst = xr_logic.pstor_retrieve(actor, "gpt_need_thirst", 0)
+		hunger = gpt_companion_get_need("hunger", 0),
+		thirst = gpt_companion_get_need("thirst", 0)
 	}
 end
 
