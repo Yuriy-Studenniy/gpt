@@ -174,7 +174,19 @@ local function gpt_check_weapon_ammo(wanted_section, item)
 			local total_ammo = item:get_ammo_total()
 			local magazine_ammo = item:get_ammo_in_magazine()
 			local reserve_ammo = total_ammo - magazine_ammo
-			if reserve_ammo < 60 then
+
+			local reserve_target = 60
+			if ini:line_exist(weapon_section, "ammo_mag_size") then
+				local magazine_size = ini:r_u32(weapon_section, "ammo_mag_size")
+				reserve_target = magazine_size * 2
+				if reserve_target < 4 then
+					reserve_target = 4
+				elseif reserve_target > 120 then
+					reserve_target = 120
+				end
+			end
+
+			if reserve_ammo < reserve_target then
 				gpt_loot_ammo_needed = true
 			end
 			return
@@ -217,6 +229,8 @@ local function gpt_count_loot_inventory(npc, item)
 		gpt_loot_counts.medkits = gpt_loot_counts.medkits + 1
 	elseif section == "bandage" then
 		gpt_loot_counts.bandages = gpt_loot_counts.bandages + 1
+	elseif section == "grenade_f1" or section == "grenade_rgd5" then
+		gpt_loot_counts.grenades = gpt_loot_counts.grenades + 1
 	end
 end
 
@@ -231,7 +245,7 @@ local function gpt_begin_loot_context(npc)
 	end
 
 	gpt_loot_target = npc
-	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, bandages = 0}
+	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, bandages = 0, grenades = 0}
 	gpt_loot_ammo_taken = {}
 	npc:iterate_inventory(gpt_count_loot_inventory, npc)
 
@@ -298,6 +312,10 @@ local function gpt_wants_loot_section(section)
 		return gpt_loot_counts.bandages < 2
 	end
 
+	if section == "grenade_f1" or section == "grenade_rgd5" then
+		return gpt_loot_counts.grenades < 4
+	end
+
 	if string.sub(section, 1, 5) == "ammo_" then
 		return gpt_wants_ammo(section)
 	end
@@ -330,6 +348,8 @@ local function gpt_mark_loot_taken(section)
 		gpt_loot_counts.medkits = gpt_loot_counts.medkits + 1
 	elseif section == "bandage" then
 		gpt_loot_counts.bandages = gpt_loot_counts.bandages + 1
+	elseif section == "grenade_f1" or section == "grenade_rgd5" then
+		gpt_loot_counts.grenades = gpt_loot_counts.grenades + 1
 	end
 end
 
