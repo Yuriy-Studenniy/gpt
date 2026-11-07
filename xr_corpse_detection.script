@@ -384,12 +384,9 @@ local function gpt_begin_loot_context(npc)
 	gpt_loot_detector_rank = 0
 	npc:iterate_inventory(gpt_count_loot_inventory, npc)
 
-	local hunger = 0
-	local thirst = 0
-	if db.actor ~= nil and db.storage[db.actor:id()] ~= nil then
-		hunger = xr_logic.pstor_retrieve(db.actor, "gpt_need_hunger", 0)
-		thirst = xr_logic.pstor_retrieve(db.actor, "gpt_need_thirst", 0)
-	end
+	local needs = gpt_companion_get_needs()
+	local hunger = needs and needs.hunger or 0
+	local thirst = needs and needs.thirst or 0
 
 	gpt_loot_needs = {
 		hunger = hunger,
