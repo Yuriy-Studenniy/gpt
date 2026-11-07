@@ -1,8 +1,8 @@
 --'******************************************************
---'*        Реестр смарт-террейнов. Игровое поле симуляции.
+--'*        ГђГҐГҐГ±ГІГ° Г±Г¬Г Г°ГІ-ГІГҐГ°Г°ГҐГ©Г­Г®Гў. Г€ГЈГ°Г®ГўГ®ГҐ ГЇГ®Г«ГҐ Г±ГЁГ¬ГіГ«ГїГ¶ГЁГЁ.
 --'******************************************************
 
---' В этом ltx хранятся дескрипторы сквадов.
+--' Г‚ ГЅГІГ®Г¬ ltx ГµГ°Г Г­ГїГІГ±Гї Г¤ГҐГ±ГЄГ°ГЁГЇГІГ®Г°Г» Г±ГЄГўГ Г¤Г®Гў.
 squad_ltx = system_ini()
 setting_ini = ini_file("misc\\simulation.ltx")
 
@@ -129,6 +129,11 @@ simulation_activities = {
 					},
 			actor = { prec = function(squad, target) return in_time_interval(19,6) and simulation_objects.sim_dist_to(squad, target) <= 150 end }
 	},
+	gpt_companion = {
+			squad = nil,
+			smart = nil,
+			actor = { prec = function(squad, target) return true end }
+	},
 	monster_special = {
 			squad = nil,
 			smart = { 	lair	 = { prec = function() return true end }
@@ -146,26 +151,26 @@ simulation_activities = {
 
 class "sim_board"
 function sim_board:__init()
-	--' Таблица содержащая смарты и данные о них в формате:
+	--' Г’Г ГЎГ«ГЁГ¶Г  Г±Г®Г¤ГҐГ°Г¦Г Г№Г Гї Г±Г¬Г Г°ГІГ» ГЁ Г¤Г Г­Г­Г»ГҐ Г® Г­ГЁГµ Гў ГґГ®Г°Г¬Г ГІГҐ:
 	--' smart = {smrt, targets = {}, dangers = {}, squads = {}, stayed_squad_quan = 0}
 	self.smarts = {}
 	self.simulation_started = true
 
-	--' Таблица смартов по именам.
+	--' Г’Г ГЎГ«ГЁГ¶Г  Г±Г¬Г Г°ГІГ®Гў ГЇГ® ГЁГ¬ГҐГ­Г Г¬.
 	self.smarts_by_names = {}
 
-	--' Таблица существующих отрядов.
+	--' Г’Г ГЎГ«ГЁГ¶Г  Г±ГіГ№ГҐГ±ГІГўГіГѕГ№ГЁГµ Г®ГІГ°ГїГ¤Г®Гў.
 	self.squads = {}
 
-	--' отрисовывается ли сейчас поле на карте.
+	--' Г®ГІГ°ГЁГ±Г®ГўГ»ГўГ ГҐГІГ±Гї Г«ГЁ Г±ГҐГ©Г·Г Г± ГЇГ®Г«ГҐ Г­Г  ГЄГ Г°ГІГҐ.
 	--self.show_flag = false
 
-	--' Таблица спаунсмартов. Смарт = уровень.
+	--' Г’Г ГЎГ«ГЁГ¶Г  Г±ГЇГ ГіГ­Г±Г¬Г Г°ГІГ®Гў. Г‘Г¬Г Г°ГІ = ГіГ°Г®ГўГҐГ­Гј.
 	self.spawn_smarts = {}
-	-- Таблица для логовов мутантов на уровнях
+	-- Г’Г ГЎГ«ГЁГ¶Г  Г¤Г«Гї Г«Г®ГЈГ®ГўГ®Гў Г¬ГіГІГ Г­ГІГ®Гў Г­Г  ГіГ°Г®ГўГ­ГїГµ
 	self.mutant_lair = {}
 
-	-- Временная таблица
+	-- Г‚Г°ГҐГ¬ГҐГ­Г­Г Гї ГІГ ГЎГ«ГЁГ¶Г 
 	self.tmp_assigned_squad = {}
 	self.tmp_entered_squad = {}
 
@@ -177,12 +182,12 @@ end
 function sim_board:stop_sim()
 	self.simulation_started = false
 end
--- Перевод игрока в группировку.
+-- ГЏГҐГ°ГҐГўГ®Г¤ ГЁГЈГ°Г®ГЄГ  Гў ГЈГ°ГіГЇГЇГЁГ°Г®ГўГЄГі.
 function sim_board:set_actor_community(community)
-	---- Устанавливаем группировку игрока
+	---- Г“Г±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГ¬ ГЈГ°ГіГЇГЇГЁГ°Г®ГўГЄГі ГЁГЈГ°Г®ГЄГ 
 	db.actor:set_character_community(actor_communitites[community], 0, 0)
 end
---' Регистрация нового смарта.
+--' ГђГҐГЈГЁГ±ГІГ°Г Г¶ГЁГї Г­Г®ГўГ®ГЈГ® Г±Г¬Г Г°ГІГ .
 function sim_board:register_smart(obj)
 	printf("register_smart %s", obj:name())
 	if self.smarts[obj.id] ~= nil then
@@ -194,7 +199,7 @@ function sim_board:register_smart(obj)
 	self.smarts_by_names[obj:name()] = obj
 
 end
--- Инициализация смарта
+-- Г€Г­ГЁГ¶ГЁГ Г«ГЁГ§Г Г¶ГЁГї Г±Г¬Г Г°ГІГ 
 function sim_board:init_smart(obj)
 	if self.tmp_assigned_squad[obj.id] ~= nil then
 		for k,v in pairs(self.tmp_assigned_squad[obj.id]) do
@@ -209,7 +214,7 @@ function sim_board:init_smart(obj)
 		self.tmp_entered_squad[obj.id] = nil
 	end
 end
---' АнРегистрация смарта.
+--' ГЂГ­ГђГҐГЈГЁГ±ГІГ°Г Г¶ГЁГї Г±Г¬Г Г°ГІГ .
 function sim_board:unregister_smart(obj)
 	if self.smarts[obj.id] == nil then
 		abort("Trying to unregister nil smart [%s]", obj:name())
@@ -218,7 +223,7 @@ function sim_board:unregister_smart(obj)
 	self.smarts[obj.id] = nil
 end
 
---' Создание нового отряда
+--' Г‘Г®Г§Г¤Г Г­ГЁГҐ Г­Г®ГўГ®ГЈГ® Г®ГІГ°ГїГ¤Г 
 function sim_board:create_squad(spawn_smart, sq_id)
 	printf("create squad called")
 	local squad_id = tostring(sq_id)
@@ -229,19 +234,19 @@ function sim_board:create_squad(spawn_smart, sq_id)
 	--local squad = squad_class(self, squad_id, faction_name, settings_id)
 	--squad:init_squad(spawn_smart)
 	printf("Creating squad[%s] in smart[%s]", squad_id, spawn_smart:name())
-	--' Определяем в каком смарте создать новый отряд
+	--' ГЋГЇГ°ГҐГ¤ГҐГ«ГїГҐГ¬ Гў ГЄГ ГЄГ®Г¬ Г±Г¬Г Г°ГІГҐ Г±Г®Г§Г¤Г ГІГј Г­Г®ГўГ»Г© Г®ГІГ°ГїГ¤
 	squad:create_npc(spawn_smart)
 	squad:set_squad_relation()
 	self:assign_squad_to_smart(squad, spawn_smart.id)
 
-	--' Пересчитываем Team, Squad, Group
+	--' ГЏГҐГ°ГҐГ±Г·ГЁГІГ»ГўГ ГҐГ¬ Team, Squad, Group
 	for k in squad:squad_members() do
 		local obj = k.object
 		squad.board:setup_squad_and_group(obj)
 	end
 	return squad
 end
---' Удалить отряд
+--' Г“Г¤Г Г«ГЁГІГј Г®ГІГ°ГїГ¤
 function sim_board:remove_squad(squad)
 	printf("Remove squad %s", tostring(squad.id))
 	if squad.current_action == nil or
@@ -255,10 +260,10 @@ function sim_board:remove_squad(squad)
 
 	squad:remove_squad()
 end
---' Назначение отряда в смарт.
+--' ГЌГ Г§Г­Г Г·ГҐГ­ГЁГҐ Г®ГІГ°ГїГ¤Г  Гў Г±Г¬Г Г°ГІ.
 function sim_board:assign_squad_to_smart(squad, smart_id)
-	-- Если смарта нету (например на загрузке он еще не загружен), то мы загоняем данные
-	-- во временную таблицу. И на загрузке смарта автодобавляем их.
+	-- Г…Г±Г«ГЁ Г±Г¬Г Г°ГІГ  Г­ГҐГІГі (Г­Г ГЇГ°ГЁГ¬ГҐГ° Г­Г  Г§Г ГЈГ°ГіГ§ГЄГҐ Г®Г­ ГҐГ№ГҐ Г­ГҐ Г§Г ГЈГ°ГіГ¦ГҐГ­), ГІГ® Г¬Г» Г§Г ГЈГ®Г­ГїГҐГ¬ Г¤Г Г­Г­Г»ГҐ
+	-- ГўГ® ГўГ°ГҐГ¬ГҐГ­Г­ГіГѕ ГІГ ГЎГ«ГЁГ¶Гі. Г€ Г­Г  Г§Г ГЈГ°ГіГ§ГЄГҐ Г±Г¬Г Г°ГІГ  Г ГўГІГ®Г¤Г®ГЎГ ГўГ«ГїГҐГ¬ ГЁГµ.
 	--printf("assigned squad %s to smart [%s].", tostring(squad.id), tostring(smart_id))
 
 	if smart_id ~= nil and self.smarts[smart_id] == nil then
@@ -271,7 +276,7 @@ function sim_board:assign_squad_to_smart(squad, smart_id)
 	end
 
 
-	--' Убираем отряд из старого смарта
+	--' Г“ГЎГЁГ°Г ГҐГ¬ Г®ГІГ°ГїГ¤ ГЁГ§ Г±ГІГ Г°Г®ГЈГ® Г±Г¬Г Г°ГІГ 
 	local old_smart_id = nil
 	if squad.smart_id ~= nil then
 		old_smart_id = squad.smart_id
@@ -288,12 +293,12 @@ function sim_board:assign_squad_to_smart(squad, smart_id)
 
 	squad:assign_smart(self.smarts[smart_id].smrt)
 
-	--' Прописываем отряд в новом смарте.
+	--' ГЏГ°Г®ГЇГЁГ±Г»ГўГ ГҐГ¬ Г®ГІГ°ГїГ¤ Гў Г­Г®ГўГ®Г¬ Г±Г¬Г Г°ГІГҐ.
 	self.smarts[smart_id].squads[squad.id] = squad
 
 	self.smarts[smart_id].smrt:refresh()
 end
---' Отряд покидает смарт (уменьшаются ресурсы)
+--' ГЋГІГ°ГїГ¤ ГЇГ®ГЄГЁГ¤Г ГҐГІ Г±Г¬Г Г°ГІ (ГіГ¬ГҐГ­ГјГёГ ГѕГІГ±Гї Г°ГҐГ±ГіГ°Г±Г»)
 function sim_board:exit_smart(squad, smart_id)
 	if smart_id == nil then
 		return
@@ -317,7 +322,7 @@ function sim_board:exit_smart(squad, smart_id)
 
 	--smart.smrt:refresh()
 end
---' Отряд занимает смарт (увеличиваются ресурсы)
+--' ГЋГІГ°ГїГ¤ Г§Г Г­ГЁГ¬Г ГҐГІ Г±Г¬Г Г°ГІ (ГіГўГҐГ«ГЁГ·ГЁГўГ ГѕГІГ±Гї Г°ГҐГ±ГіГ°Г±Г»)
 function sim_board:enter_smart(squad, smart_id, after_load)
 	callstack()
 	if self.smarts[smart_id] == nil then
@@ -343,18 +348,18 @@ function sim_board:enter_smart(squad, smart_id, after_load)
 	squad.items_spawned = false
 end
 
--- установить squad и group в соответствии с работой
+-- ГіГ±ГІГ Г­Г®ГўГЁГІГј squad ГЁ group Гў Г±Г®Г®ГІГўГҐГІГ±ГІГўГЁГЁ Г± Г°Г ГЎГ®ГІГ®Г©
 function sim_board:setup_squad_and_group(obj)
 	--printf("tsg["..obj:name().."]")
 	local level_name = level.name()
-	--' Группу берем из уровня.
+	--' ГѓГ°ГіГЇГЇГі ГЎГҐГ°ГҐГ¬ ГЁГ§ ГіГ°Г®ГўГ­Гї.
 	local obj = alife():object(obj.id)
 
 	local group = group_id_by_levels[level_name] or 0
 
 	change_team_squad_group(obj, obj.team, obj.squad, group)
 
-	--' Сквад берем из смарта.
+	--' Г‘ГЄГўГ Г¤ ГЎГҐГ°ГҐГ¬ ГЁГ§ Г±Г¬Г Г°ГІГ .
 	local squad = alife():object(obj.group_id)
 	if squad == nil then
 		change_team_squad_group(obj, obj.team, 0, obj.group)
@@ -382,7 +387,7 @@ function sim_board:setup_squad_and_group(obj)
 	--printf("TSG3: [%s][%s][%s]", tostring(obj.team), tostring(obj.squad), tostring(obj.group))
 end
 
---' Заполнение стартового расположения
+--' Г‡Г ГЇГ®Г«Г­ГҐГ­ГЁГҐ Г±ГІГ Г°ГІГ®ГўГ®ГЈГ® Г°Г Г±ГЇГ®Г«Г®Г¦ГҐГ­ГЁГї
 function sim_board:fill_start_position()
 	if self.start_position_filled == true then
 		return
@@ -414,16 +419,16 @@ function sim_board:fill_start_position()
 end
 
 
---' Возвратить смарт по его имени.
+--' Г‚Г®Г§ГўГ°Г ГІГЁГІГј Г±Г¬Г Г°ГІ ГЇГ® ГҐГЈГ® ГЁГ¬ГҐГ­ГЁ.
 function sim_board:get_smart_by_name(name)
 	return self.smarts_by_names[name]
 end
---' Возвращает количество отрядов в смарте.
+--' Г‚Г®Г§ГўГ°Г Г№Г ГҐГІ ГЄГ®Г«ГЁГ·ГҐГ±ГІГўГ® Г®ГІГ°ГїГ¤Г®Гў Гў Г±Г¬Г Г°ГІГҐ.
 function sim_board:get_smart_population(smart)
 	return self.smarts[smart.id].stayed_squad_quan
 end
 
---' Получение игрового поля.
+--' ГЏГ®Г«ГіГ·ГҐГ­ГЁГҐ ГЁГЈГ°Г®ГўГ®ГЈГ® ГЇГ®Г«Гї.
 function get_sim_board()
 	if board == nil then
 		board = sim_board()
@@ -440,7 +445,7 @@ function sim_board:get_squad_target(squad)
 	local max_prior = 0
 	for k,v in pairs(simulation_objects.get_sim_obj_registry().objects)	do
 		local curr_prior = 0
-		-- Проверка против выдачи таска на себя.
+		-- ГЏГ°Г®ГўГҐГ°ГЄГ  ГЇГ°Г®ГІГЁГў ГўГ»Г¤Г Г·ГЁ ГІГ Г±ГЄГ  Г­Г  Г±ГҐГЎГї.
 		if v.id ~= squad.id then
 			curr_prior = v:evaluate_prior(squad)
 		end
@@ -468,12 +473,12 @@ local targets_by_squad_id = {}
 
 
 end]]--
---' Обнуление списка на создании игры.
+--' ГЋГЎГ­ГіГ«ГҐГ­ГЁГҐ Г±ГЇГЁГ±ГЄГ  Г­Г  Г±Г®Г§Г¤Г Г­ГЁГЁ ГЁГЈГ°Г».
 function clear()
 	board = nil
 end
 
---' Тестовые функции
+--' Г’ГҐГ±ГІГ®ГўГ»ГҐ ГґГіГ­ГЄГ¶ГЁГЁ
 function print()
 	--print_table(get_sim_board().smarts)
 end
