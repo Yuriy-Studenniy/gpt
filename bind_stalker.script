@@ -15,31 +15,34 @@ local game_difficulty_by_num = {
 
 local weapon_hide = {}
 local primary_objects_filled = false
--- GPT AI Companion: choose a nearby reachable level vertex instead of spawning inside the actor.
+-- GPT AI Companion: search several rings for a reachable vertex away from the actor.
 local function gpt_companion_spawn_point(actor)
 	local actor_vertex_id = actor:level_vertex_id()
-	local angles = {45, -45, 90, -90, 135, -135}
+	local angles = {45, -45, 90, -90, 135, -135, 180}
+	local distances = {2.0, 3.0, 4.0, 6.0}
 
-	for i = 1, #angles do
-		local angle = angles[i] * 0.017453292519943295769236907684886
-		local forward = actor:direction()
-		local cosine = math.cos(angle)
-		local sine = math.sin(angle)
-		local direction = vector():set(
-			forward.x * cosine - forward.z * sine,
-			forward.y,
-			forward.x * sine + forward.z * cosine
-		)
-		local candidate = level.vertex_in_direction(actor_vertex_id, direction, 2.0)
-		if candidate ~= nil and candidate ~= actor_vertex_id and actor:accessible(candidate) == true then
-			return level.vertex_position(candidate), candidate
+	for distance_index = 1, #distances do
+		local distance = distances[distance_index]
+		for angle_index = 1, #angles do
+			local angle = angles[angle_index] * 0.017453292519943295769236907684886
+			local forward = actor:direction()
+			local cosine = math.cos(angle)
+			local sine = math.sin(angle)
+			local direction = vector():set(
+				forward.x * cosine - forward.z * sine,
+				forward.y,
+				forward.x * sine + forward.z * cosine
+			)
+			local candidate = level.vertex_in_direction(actor_vertex_id, direction, distance)
+			if candidate ~= nil and candidate ~= actor_vertex_id and actor:accessible(candidate) == true then
+				return level.vertex_position(candidate), candidate
+			end
 		end
 	end
 
-	printf("[GPT_COMPANION] WARNING: no nearby reachable spawn vertex; using actor position")
-	return actor:position(), actor_vertex_id
+	printf("[GPT_COMPANION] No safe nearby spawn vertex found")
+	return nil, nil
 end
-
 
 local function ensure_gpt_companion_squad(companion_id, actor)
 	local story_id = "gpt_companion_squad"
@@ -57,12 +60,12 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 	local companion = alife():object(companion_id)
 	if companion == nil then
 		printf("[GPT_COMPANION] ERROR: companion missing while registering squad")
-		return nil
+		return nil, "companion_missing"
 	end
 
 	if companion:alive() ~= true then
-		printf("[GPT_COMPANION] Companion is dead; not recreating its squad")
-		return nil
+		printf("[GPT_COMPANION] Companion is dead; preserving death and not recreating its squad")
+		return nil, "companion_dead"
 	end
 
 	if squad == nil then
@@ -76,39 +79,57 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 
 	if squad == nil then
 		printf("[GPT_COMPANION] ERROR: squad creation returned nil")
-		return nil
+		return nil, "squad_create_failed"
 	end
 
 	if companion.group_id == 65535 or companion.group_id == nil then
-		squad:register_member(companion.id)
+		local register_ok, register_error = pcall(function()
+			squad:register_member(companion.id)
+		end)
+		if not register_ok then
+			printf("[GPT_COMPANION] ERROR: squad registration failed: %s", tostring(register_error))
+			return nil, "squad_registration_failed"
+		end
 		printf("[GPT_COMPANION] Registered companion %s in squad %s", tostring(companion.id), tostring(squad.id))
 	elseif companion.group_id ~= squad.id then
 		printf("[GPT_COMPANION] ERROR: companion %s already belongs to group %s", tostring(companion.id), tostring(companion.group_id))
-		return nil
+		return nil, "companion_in_other_group"
 	end
 
 	if companion.group_id ~= squad.id then
 		printf("[GPT_COMPANION] ERROR: companion was not attached to its A-Life squad")
-		return nil
+		return nil, "squad_registration_not_confirmed"
 	end
 
-	squad:set_squad_relation()
+	local relation_ok, relation_error = pcall(function()
+		squad:set_squad_relation()
+	end)
+	if not relation_ok then
+		printf("[GPT_COMPANION] ERROR: squad relation setup failed: %s", tostring(relation_error))
+		return nil, "squad_relation_failed"
+	end
 
-	local sound_registered = false
-	for _, entry in pairs(squad.sound_manager.npc) do
-		if entry.npc_id == companion.id then
-			sound_registered = true
-			break
+	-- Sound registration is auxiliary: it must not invalidate a working A-Life squad.
+	local sound_ok, sound_error = pcall(function()
+		local sound_registered = false
+		for _, entry in pairs(squad.sound_manager.npc) do
+			if entry.npc_id == companion.id then
+				sound_registered = true
+				break
+			end
 		end
-	end
-	if not sound_registered then
-		squad.sound_manager:register_npc(companion.id)
+		if not sound_registered then
+			squad.sound_manager:register_npc(companion.id)
+		end
+	end)
+	if not sound_ok then
+		printf("[GPT_COMPANION] WARNING: sound manager registration failed: %s", tostring(sound_error))
 	end
 
-	return squad.id
+	return squad.id, "ready"
 end
 
--- GPT AI Companion: create the unique stalker once, then reuse the saved A-Life object.
+-- Create the unique stalker once, then reuse the saved A-Life object.
 local function ensure_gpt_companion_spawned(actor)
 	local story_id = "gpt_companion_main"
 	local registry = get_story_objects_registry()
@@ -118,13 +139,20 @@ local function ensure_gpt_companion_spawned(actor)
 		local existing_object = alife():object(existing_id)
 		if existing_object ~= nil then
 			printf("[GPT_COMPANION] Existing companion found: id=%s", tostring(existing_id))
-			ensure_gpt_companion_squad(existing_id, actor)
-			return existing_id
+			local squad_id, setup_status = ensure_gpt_companion_squad(existing_id, actor)
+			if squad_id == nil then
+				return nil, setup_status
+			end
+			return existing_id, "ready"
 		end
 		registry:unregister_by_story_id(story_id)
 	end
 
 	local spawn_position, spawn_vertex_id = gpt_companion_spawn_point(actor)
+	if spawn_position == nil or spawn_vertex_id == nil then
+		return nil, "no_safe_spawn_point"
+	end
+
 	local companion = alife():create(
 		"gpt_companion_main",
 		spawn_position,
@@ -134,12 +162,55 @@ local function ensure_gpt_companion_spawned(actor)
 
 	if companion == nil then
 		printf("[GPT_COMPANION] ERROR: companion creation returned nil")
-		return nil
+		return nil, "companion_create_failed"
 	end
 
 	printf("[GPT_COMPANION] Created unique companion: id=%s", tostring(companion.id))
-	ensure_gpt_companion_squad(companion.id, actor)
-	return companion.id
+	local squad_id, setup_status = ensure_gpt_companion_squad(companion.id, actor)
+	if squad_id == nil then
+		return nil, setup_status
+	end
+
+	return companion.id, "ready"
+end
+
+local function gpt_update_companion_setup(binder)
+	if binder.gpt_companion_setup_complete or binder.gpt_companion_setup_blocked then
+		return
+	end
+
+	local now = time_global()
+	if binder.gpt_companion_setup_retry_at ~= nil and now < binder.gpt_companion_setup_retry_at then
+		return
+	end
+
+	binder.gpt_companion_setup_attempts = (binder.gpt_companion_setup_attempts or 0) + 1
+	local companion_id, setup_status = ensure_gpt_companion_spawned(binder.object)
+	if companion_id ~= nil then
+		binder.gpt_companion_setup_complete = true
+		binder.gpt_companion_setup_retry_at = nil
+		printf("[GPT_COMPANION] Setup complete: companion=%s", tostring(companion_id))
+		return
+	end
+
+	-- A dead companion or one already owned by another squad is a persistent
+	-- state conflict, not a transient spawn failure. Preserve it without retrying.
+	if setup_status == "companion_dead" or setup_status == "companion_in_other_group" then
+		binder.gpt_companion_setup_blocked = true
+		printf("[GPT_COMPANION] Setup halted: %s", tostring(setup_status))
+		return
+	end
+
+	-- Exponential backoff avoids retrying every frame while allowing recovery
+	-- from transient A-Life registration/spawn failures.
+	local exponent = math.min(binder.gpt_companion_setup_attempts - 1, 5)
+	local retry_delay = math.min(1000 * (2 ^ exponent), 30000)
+	if binder.gpt_companion_setup_attempts > 6 then
+		retry_delay = 60000
+	end
+	binder.gpt_companion_setup_retry_at = now + retry_delay
+	printf("[GPT_COMPANION] Setup attempt %s failed (%s); retry in %s ms",
+		tostring(binder.gpt_companion_setup_attempts), tostring(setup_status), tostring(retry_delay))
 end
 
 ----------------------------------------------------------------------------------------------------------------------
