@@ -68,6 +68,15 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		return nil, "companion_dead"
 	end
 
+	-- Detect ownership conflicts before creating a new group object. Otherwise
+	-- a companion already assigned elsewhere would leave an empty orphan squad.
+	if companion.group_id ~= 65535 and companion.group_id ~= nil
+		and (squad == nil or companion.group_id ~= squad.id) then
+		printf("[GPT_COMPANION] ERROR: companion %s already belongs to group %s",
+			tostring(companion.id), tostring(companion.group_id))
+		return nil, "companion_in_other_group"
+	end
+
 	if squad == nil then
 		squad = alife():create(
 			"gpt_companion_squad",
