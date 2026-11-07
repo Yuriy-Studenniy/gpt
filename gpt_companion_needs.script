@@ -1,0 +1,48 @@
+-- GPT AI Companion: persistent survival needs.
+-- Values are abstract need levels (0 = satisfied, 100 = urgent).
+-- This module only tracks needs; it does not consume items or alter engine health.
+
+local HUNGER_PER_MINUTE = 0.18
+local THIRST_PER_MINUTE = 0.30
+
+local function clamp_need(value)
+	if value < 0 then
+		return 0
+	end
+	if value > 100 then
+		return 100
+	end
+	return value
+end
+
+function update(npc, elapsed_minutes)
+	if npc == nil or elapsed_minutes == nil or elapsed_minutes <= 0 then
+		return
+	end
+
+	local storage = db.storage[npc:id()]
+	if storage == nil then
+		return
+	end
+
+	local hunger = xr_logic.pstor_retrieve(npc, "gpt_need_hunger", 0)
+	local thirst = xr_logic.pstor_retrieve(npc, "gpt_need_thirst", 0)
+
+	hunger = clamp_need(hunger + HUNGER_PER_MINUTE * elapsed_minutes)
+	thirst = clamp_need(thirst + THIRST_PER_MINUTE * elapsed_minutes)
+
+	xr_logic.pstor_store(npc, "gpt_need_hunger", hunger)
+	xr_logic.pstor_store(npc, "gpt_need_thirst", thirst)
+end
+
+function get(npc)
+	if npc == nil or db.storage[npc:id()] == nil then
+		return nil
+	end
+
+	return {
+		hunger = xr_logic.pstor_retrieve(npc, "gpt_need_hunger", 0),
+		thirst = xr_logic.pstor_retrieve(npc, "gpt_need_thirst", 0),
+		health = npc.health
+	}
+end
