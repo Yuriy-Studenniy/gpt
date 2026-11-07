@@ -465,3 +465,11 @@
 - При миграции раннего прототипа отсутствующие hunger/thirst читаются из PSTOR участника перед переходом на actor PSTOR. Членство читается через `squad_members()` и `member.id`, как ожидает vanilla iterator.
 - Ограничение: статический просмотр подтверждает формат/пути сериализации, но не реальный результат save -> load, не все моменты создания `db.storage[actor_id]` в engine lifecycle и не численную скорость голода/жажды в игровом времени.
 - Решение: backend оставить в actor PSTOR. Перенос на NPC/squad добавил бы зависимость от online/offline сериализации без подтверждённой пользы. Проверить в едином игровом прогоне: сохранение/загрузка при нескольких уровнях hunger/thirst, рост потребностей при offline спутнике, отсутствие скачка/дублирования после еды, смерть спутника не должна создавать нового с восстановлением needs.
+
+### Статический аудит STATE_Write/STATE_Read companion squad
+
+- `sim_squad_scripted:STATE_Write()` сначала делегирует базовой online/offline группе, затем сохраняет target/respawn/smart поля. `STATE_Read()` вызывает базовую загрузку, восстанавливает эти поля и запускает `init_squad_on_load()`.
+- Флаг `gpt_companion` и squad settings читаются из `squad_descr.ltx` через `init_squad()` при создании Lua-объекта; флаг не хранится отдельным custom полем в `STATE_Write`. Для текущего уникального companion section это ожидаемая конфигурационная идентичность, а не изменяемое состояние персонажа.
+- Потребности и время не сериализуются в squad `STATE_Write/STATE_Read`: они принадлежат actor PSTOR и попадают в actor binder `pstor_save_all/load_all`. Таким образом, companion group сохраняет только своё A-Life/target/smart состояние, а значения needs имеют отдельный save-backed путь.
+- При загрузке squad `init_squad_on_load()` повторно устанавливает smart assignment; у companion `smart_id` обычно nil, а цель для него задаётся отдельной веткой `sim_board:get_squad_target()` по игроку. Нужно проверить в игре, что базовая загрузка member list уже завершена к моменту `init_squad_on_load()` и что actor PSTOR доступен к первому needs update.
+- Решение: новый persistence field в squad не добавлять. Сериализация разнесена по правильным владельцам данных; остаётся runtime-проверка порядка вызовов engine callbacks при save/load и смене уровня.
