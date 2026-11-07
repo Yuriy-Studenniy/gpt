@@ -60,6 +60,10 @@ local function gpt_try_companion_consumption(npc)
 		return false
 	end
 
+	if npc:wounded() == true or xr_wounded.is_wounded(npc) then
+		return false
+	end
+
 	if db.actor == nil or db.storage[db.actor:id()] == nil then
 		return false
 	end
