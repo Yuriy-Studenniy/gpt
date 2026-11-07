@@ -553,26 +553,32 @@ function evaluator_corpse:__init(name, storage, npc) super (nil, name)
 end
 function evaluator_corpse:evaluate()
 	if not self.object:alive() then
+		gpt_release_selected_corpse(self.object, self.a)
 		return false
 	end
 
 	if self.object:best_enemy() ~= nil then
+		gpt_release_selected_corpse(self.object, self.a)
 		return false
 	end
 
 	if self.object:character_community() == "zombied" then
+		gpt_release_selected_corpse(self.object, self.a)
 		return false
 	end
 
 	if self.a.corpse_detection_enabled == false then
+		gpt_release_selected_corpse(self.object, self.a)
 		return false
 	end
 
 	if xr_wounded.is_wounded(self.object) then
+		gpt_release_selected_corpse(self.object, self.a)
 		return false
 	end
 
 	if self.object:section() == "actor_visual_stalker" then
+		gpt_release_selected_corpse(self.object, self.a)
 		return false
 	end
 
@@ -638,6 +644,7 @@ function evaluator_corpse:evaluate()
 		return true
 	end
 
+	gpt_release_selected_corpse(self.object, self.a)
 	return false
 end
 
@@ -769,6 +776,7 @@ function get_all_from_corpse(npc)
 	local corpse_npc = corpse_storage and corpse_storage.object
 
 	if corpse_npc == nil then
+		gpt_release_selected_corpse(npc, corpse_detection)
 		return
 	end
 
