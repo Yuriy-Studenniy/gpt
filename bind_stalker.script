@@ -226,8 +226,12 @@ function actor_binder:__init (obj) super(obj)
 --	self.actor_weapon_on_start = true
 	self.loaded_active_slot = 3
 	self.loaded_slot_applied = false
-	self.last_detective_achievement_spawn_time 	= nil
-	self.last_mutant_hunter_achievement_spawn_time	= nil
+	self.last_detective_achievement_spawn_time = nil
+	self.last_mutant_hunter_achievement_spawn_time = nil
+	self.gpt_companion_setup_complete = false
+	self.gpt_companion_setup_blocked = false
+	self.gpt_companion_setup_attempts = 0
+	self.gpt_companion_setup_retry_at = nil
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -255,6 +259,10 @@ function actor_binder:net_spawn(data)
 	self.spawn_frame = device().frame
 	self.already_jumped = false
 	self.loaded = false
+	self.gpt_companion_setup_complete = false
+	self.gpt_companion_setup_blocked = false
+	self.gpt_companion_setup_attempts = 0
+	self.gpt_companion_setup_retry_at = nil
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
@@ -552,10 +560,14 @@ function actor_binder:update(delta)
 	simulation_objects.get_sim_obj_registry():update_avaliability(alife():actor())
 
 	if not self.loaded then
-		ensure_gpt_companion_spawned(self.object)
 		get_console():execute("dump_infos")
 		self.loaded = true
 	end
+
+	-- Companion setup is independent from the actor's one-time world-load work.
+	-- A temporary A-Life failure must not permanently suppress later attempts.
+	gpt_update_companion_setup(self)
+
 	treasure_manager.get_treasure_manager():update()
 
 	if not(primary_objects_filled) then
