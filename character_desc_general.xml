@@ -6567,10 +6567,10 @@
 			wpn_knife = 1 \n
 			stalker_outfit = 1 \n
 			device_torch = 1 \n
-			bandage = 3 \n
 			medkit = 2 \n
 			bread = 1 \n
 			conserva = 1 \n
+			energy_drink = 1 \n
 		</supplies>
 	</specific_character>
 
