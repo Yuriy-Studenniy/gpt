@@ -255,3 +255,14 @@
 - Коммит: `0305ff457cba670e3edc9438eb44a008d546a827` — Protect companion consumption from item API errors.
 - Ограничение: `pcall` не защищает от native crash/assert внутри движка и не заменяет in-game verification.
 
+
+
+## 2026-11-08 — Стабильный учёт экипировки после transfer_item
+
+- В companion path `get_item()` профиль предмета (equipment group) уже вычислялся до `transfer_item()`, но затем `gpt_mark_loot_taken()` повторно читал `section/cost/condition` у того же wrapper после смены владельца.
+- Это было лишним runtime-риском: wrapper после переноса может иметь другой жизненный цикл/owner и повторное чтение профиля не нужно для учёта.
+- Теперь `gpt_mark_loot_taken(section, equipment_group)` получает заранее рассчитанную группу, и обновляет только счётчики/флаги. Подтверждение успешного transfer по `item:parent()` остаётся до этого вызова.
+- Для обычных NPC прежний vanilla one-pass путь не изменён.
+- Коммит: `23d894e209853791838b6f44526a0d3a73ec1cc4` — Avoid re-reading transferred item state.
+- Проверка статическая; валидность parent и callback timing ещё предстоит подтвердить в CoP 1.6.02.
+
