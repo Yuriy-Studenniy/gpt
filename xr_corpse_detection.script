@@ -156,6 +156,113 @@ local gpt_loot_needs = nil
 local gpt_loot_ammo_taken = nil
 local gpt_loot_ammo_needed = false
 
+local gpt_loot_equipment_best = nil
+local gpt_loot_equipment_taken = nil
+local gpt_loot_detector_rank = 0
+
+local gpt_detector_ranks = {
+	["detector_simple"] = 1,
+	["detector_advanced"] = 2,
+	["detector_elite"] = 3,
+	["detector_scientific"] = 4
+}
+
+local function gpt_get_item_value(item)
+	local ok_cost, cost = pcall(function()
+		return item:cost()
+	end)
+	local ok_condition, condition = pcall(function()
+		return item:condition()
+	end)
+
+	if not ok_cost or not ok_condition
+		or type(cost) ~= "number" or type(condition) ~= "number" then
+		return nil
+	end
+
+	if cost < 0 then cost = 0 end
+	if condition < 0 then condition = 0 end
+	if condition > 1 then condition = 1 end
+	return cost * condition
+end
+
+local function gpt_read_protection(section, field)
+	local ini = system_ini()
+	if not ini:line_exist(section, field) then
+		return 0
+	end
+
+	local ok, value = pcall(function()
+		return ini:r_float(section, field)
+	end)
+	if ok and type(value) == "number" then
+		return value
+	end
+	return 0
+end
+
+local function gpt_get_equipment_profile(item)
+	if item == nil then
+		return nil, nil
+	end
+
+	local section = item:section()
+	local item_value = gpt_get_item_value(item)
+	if item_value == nil then
+		return nil, nil
+	end
+
+	if isWeapon(item) then
+		local weapon_type = 255
+		local ok_main, main_type = pcall(function()
+			return item:get_main_weapon_type()
+		end)
+		if ok_main and type(main_type) == "number" and main_type ~= 255 then
+			weapon_type = main_type
+		else
+			local ok_type, fallback_type = pcall(function()
+				return item:get_weapon_type()
+			end)
+			if ok_type and type(fallback_type) == "number" and fallback_type ~= 255 then
+				weapon_type = fallback_type
+			end
+		end
+		return "weapon_" .. tostring(weapon_type), item_value
+	end
+
+	if string.find(section, "_outfit") ~= nil then
+		-- Compare suits by configured protection, adjusted for actual condition.
+		local protection =
+			2 * gpt_read_protection(section, "strike_protection")
+			+ 2 * gpt_read_protection(section, "explosion_protection")
+			+ 2 * gpt_read_protection(section, "wound_protection")
+			+ gpt_read_protection(section, "burn_protection")
+			+ gpt_read_protection(section, "shock_protection")
+			+ 1.5 * gpt_read_protection(section, "chemical_burn_protection")
+			+ 20 * gpt_read_protection(section, "radiation_protection")
+			+ 2 * gpt_read_protection(section, "telepatic_protection")
+
+		local cost = math.max(item:cost(), 1)
+		local condition = item_value / cost
+		if protection <= 0 then
+			protection = item_value / 1000
+			condition = 1
+		end
+		return "outfit", protection * condition
+	end
+
+	if string.sub(section, 1, 5) == "helm_" then
+		return "helmet", item_value
+	end
+
+	return nil, nil
+end
+
+local function gpt_detector_rank(section)
+	return gpt_detector_ranks[section] or 0
+end
+
+
 local function gpt_check_weapon_ammo(wanted_section, item)
 	if not isWeapon(item) then
 		return
@@ -232,6 +339,19 @@ local function gpt_count_loot_inventory(npc, item)
 	elseif section == "grenade_f1" or section == "grenade_rgd5" then
 		gpt_loot_counts.grenades = gpt_loot_counts.grenades + 1
 	end
+
+	local equipment_group, equipment_score = gpt_get_equipment_profile(item)
+	if equipment_group ~= nil and equipment_score ~= nil then
+		local current_best = gpt_loot_equipment_best[equipment_group]
+		if current_best == nil or equipment_score > current_best then
+			gpt_loot_equipment_best[equipment_group] = equipment_score
+		end
+	end
+
+	local detector_rank = gpt_detector_rank(section)
+	if detector_rank > gpt_loot_detector_rank then
+		gpt_loot_detector_rank = detector_rank
+	end
 end
 
 local function gpt_begin_loot_context(npc)
@@ -241,12 +361,18 @@ local function gpt_begin_loot_context(npc)
 		gpt_loot_counts = nil
 		gpt_loot_needs = nil
 		gpt_loot_ammo_taken = nil
+		gpt_loot_equipment_best = nil
+		gpt_loot_equipment_taken = nil
+		gpt_loot_detector_rank = 0
 		return
 	end
 
 	gpt_loot_target = npc
 	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, bandages = 0, grenades = 0}
 	gpt_loot_ammo_taken = {}
+	gpt_loot_equipment_best = {}
+	gpt_loot_equipment_taken = {}
+	gpt_loot_detector_rank = 0
 	npc:iterate_inventory(gpt_count_loot_inventory, npc)
 
 	local hunger = 0
@@ -268,9 +394,12 @@ local function gpt_end_loot_context()
 	gpt_loot_counts = nil
 	gpt_loot_needs = nil
 	gpt_loot_ammo_taken = nil
+	gpt_loot_equipment_best = nil
+	gpt_loot_equipment_taken = nil
+	gpt_loot_detector_rank = 0
 end
 
-local function gpt_wants_loot_section(section)
+local function gpt_wants_loot_section(section, item)
 	if gpt_loot_target == nil or gpt_loot_counts == nil then
 		return true
 	end
@@ -320,10 +449,30 @@ local function gpt_wants_loot_section(section)
 		return gpt_wants_ammo(section)
 	end
 
-	-- Avoid carrying exact duplicate weapons, attachments, suits, helmets and detectors.
+	-- Upgrade only equipment that is better than what the companion carries.
+	-- Only one item per equipment group is accepted from each corpse.
+	local equipment_group, equipment_score = gpt_get_equipment_profile(item)
+	if equipment_group ~= nil and equipment_score ~= nil then
+		if gpt_loot_equipment_taken[equipment_group] == true then
+			return false
+		end
+
+		local current_best = gpt_loot_equipment_best[equipment_group]
+		if current_best == nil then
+			return equipment_score > 0
+		end
+		return equipment_score > current_best * 1.10
+	end
+
+	local detector_rank = gpt_detector_rank(section)
+	if detector_rank > 0 then
+		return gpt_loot_equipment_taken.detector ~= true
+			and detector_rank > gpt_loot_detector_rank
+	end
+
+	-- Attachments and other special weapon objects are kept once per section.
 	if string.sub(section, 1, 4) == "wpn_"
 		or string.sub(section, 1, 5) == "helm_"
-		or string.sub(section, 1, 9) == "detector_"
 		or string.find(section, "_outfit") ~= nil then
 		return gpt_loot_target:object(section) == nil
 	end
@@ -331,13 +480,22 @@ local function gpt_wants_loot_section(section)
 	return true
 end
 
-local function gpt_mark_loot_taken(section)
+local function gpt_mark_loot_taken(section, item)
 	if gpt_loot_counts == nil then
 		return
 	end
 
 	if string.sub(section, 1, 5) == "ammo_" and gpt_loot_ammo_taken ~= nil then
 		gpt_loot_ammo_taken[section] = true
+	end
+
+	local equipment_group = gpt_get_equipment_profile(item)
+	if equipment_group ~= nil then
+		gpt_loot_equipment_taken[equipment_group] = true
+	end
+	if gpt_detector_rank(section) > 0 then
+		gpt_loot_equipment_taken.detector = true
+		gpt_loot_detector_rank = gpt_detector_rank(section)
 	end
 
 	if gpt_food_sections[section] then
@@ -356,7 +514,7 @@ end
 
 function check_item(npc, item)
 	local section = item:section()
-	if lootable_table[section] == true and gpt_wants_loot_section(section) then
+	if lootable_table[section] == true and gpt_wants_loot_section(section, item) then
 		corpse_contain_any_valuable = true
 	end
 end
@@ -490,9 +648,9 @@ local transfer_to_npc = nil
 
 function get_item(npc, item)
 	local section = item:section()
-	if lootable_table[section] == true and gpt_wants_loot_section(section) then
+	if lootable_table[section] == true and gpt_wants_loot_section(section, item) then
 		npc:transfer_item(item, transfer_to_npc)
-		gpt_mark_loot_taken(section)
+		gpt_mark_loot_taken(section, item)
 	end
 end
 
