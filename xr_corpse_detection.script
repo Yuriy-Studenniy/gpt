@@ -1,11 +1,11 @@
 ----------------------------------------------------------------------------------------------------------------------
---'	Ñõåìà îáûñêà òðóïîâ
---'	àâòîð: Äèäåíêî Ðóñëàí (Stohe)
+--'	Ã‘ÃµÃ¥Ã¬Ã  Ã®Ã¡Ã»Ã±ÃªÃ  Ã²Ã°Ã³Ã¯Ã®Ã¢
+--'	Ã Ã¢Ã²Ã®Ã°: Ã„Ã¨Ã¤Ã¥Ã­ÃªÃ® ÃÃ³Ã±Ã«Ã Ã­ (Stohe)
 --'	TODO:
 ----------------------------------------------------------------------------------------------------------------------
 lootable_table = {}
 
---Ïàòðîíû
+--ÃÃ Ã²Ã°Ã®Ã­Ã»
 lootable_table["ammo_9x18_fmj"] = true
 lootable_table["ammo_9x18_pmm"] = true
 lootable_table["ammo_9x19_pbp"] = true
@@ -28,7 +28,7 @@ lootable_table["grenade_rgd5"] = true
 lootable_table["ammo_m209"] = true
 lootable_table["ammo_pkm_100"] = true
 
---Îðóæèå
+--ÃŽÃ°Ã³Ã¦Ã¨Ã¥
 lootable_table["wpn_pm"] = true
 lootable_table["wpn_pb"] = true
 lootable_table["wpn_fort"] = true
@@ -61,7 +61,7 @@ lootable_table["wpn_g36"] = true
 lootable_table["wpn_fn2000"] = true
 lootable_table["wpn_pkm"] = true
 
--- Àääîíû
+-- Ã€Ã¤Ã¤Ã®Ã­Ã»
 lootable_table["wpn_addon_scope"] = true
 lootable_table["wpn_addon_scope_x2.7"] = true
 lootable_table["wpn_addon_scope_detector"] = true
@@ -75,7 +75,7 @@ lootable_table["wpn_addon_silencer"] = true
 lootable_table["wpn_addon_grenade_launcher"] = true
 lootable_table["wpn_addon_grenade_launcher_m203"] = true
 
--- Áðîíèêè
+-- ÃÃ°Ã®Ã­Ã¨ÃªÃ¨
 lootable_table["novice_outfit"] = true
 lootable_table["specops_outfit"] = true
 lootable_table["military_outfit"] = true
@@ -88,21 +88,21 @@ lootable_table["cs_heavy_outfit"] = true
 lootable_table["dolg_outfit"] = true
 lootable_table["dolg_heavy_outfit"] = true
 
--- Øëåìû
+-- Ã˜Ã«Ã¥Ã¬Ã»
 lootable_table["helm_respirator"] = true
 lootable_table["helm_hardhat"] = true
 lootable_table["helm_protective"] = true
 lootable_table["helm_tactic"] = true
 lootable_table["helm_battle"] = true
 
---Ìåäèêàìåíòû
+--ÃŒÃ¥Ã¤Ã¨ÃªÃ Ã¬Ã¥Ã­Ã²Ã»
 lootable_table["bandage"] = true
 lootable_table["medkit"] = true
 lootable_table["medkit_scientic"] = true
 lootable_table["medkit_army"] = true
 lootable_table["antirad"] = true
 
---Áóñòåðû
+--ÃÃ³Ã±Ã²Ã¥Ã°Ã»
 lootable_table["drug_booster"] = true
 lootable_table["drug_coagulant"] = true
 lootable_table["drug_psy_blockade"] = true
@@ -110,20 +110,20 @@ lootable_table["drug_antidot"] = true
 lootable_table["drug_radioprotector"] = true
 lootable_table["drug_anabiotic"] = true
 
---Åäà
+--Ã…Ã¤Ã 
 lootable_table["bread"] = true
 lootable_table["kolbasa"] = true
 lootable_table["conserva"] = true
 lootable_table["vodka"] = true
 lootable_table["energy_drink"] = true
 
---Ïðåäìåòû
+--ÃÃ°Ã¥Ã¤Ã¬Ã¥Ã²Ã»
 lootable_table["detector_simple"] = true
 lootable_table["detector_advanced"] = true
 lootable_table["detector_elite"] = true
 lootable_table["detector_scientific"] = true
 
---Óíèêàëüíûå ïðåäìåòû
+--Ã“Ã­Ã¨ÃªÃ Ã«Ã¼Ã­Ã»Ã¥ Ã¯Ã°Ã¥Ã¤Ã¬Ã¥Ã²Ã»
 lootable_table["wpn_pm_actor"] = true
 lootable_table["wpn_sig550_luckygun"] = true
 lootable_table["wpn_pkm_zulus"] = true
@@ -149,10 +149,127 @@ lootable_table["wpn_fort_snag"] = true
 
 
 local corpse_contain_any_valuable
+local gpt_loot_target = nil
+local gpt_loot_counts = nil
+local gpt_loot_needs = nil
+
+local gpt_food_sections = {
+	["bread"] = true,
+	["kolbasa"] = true,
+	["conserva"] = true
+}
+local gpt_medkit_sections = {
+	["medkit"] = true,
+	["medkit_army"] = true,
+	["medkit_scientic"] = true
+}
+
+local function gpt_count_loot_inventory(npc, item)
+	if gpt_loot_counts == nil then
+		return
+	end
+
+	local section = item:section()
+	if gpt_food_sections[section] then
+		gpt_loot_counts.food = gpt_loot_counts.food + 1
+	elseif section == "energy_drink" then
+		gpt_loot_counts.drinks = gpt_loot_counts.drinks + 1
+	elseif gpt_medkit_sections[section] then
+		gpt_loot_counts.medkits = gpt_loot_counts.medkits + 1
+	elseif section == "bandage" then
+		gpt_loot_counts.bandages = gpt_loot_counts.bandages + 1
+	end
+end
+
+local function gpt_begin_loot_context(npc)
+	gpt_loot_target = npc
+	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, bandages = 0}
+	npc:iterate_inventory(gpt_count_loot_inventory, npc)
+
+	local hunger = 0
+	local thirst = 0
+	if db.actor ~= nil and db.storage[db.actor:id()] ~= nil then
+		hunger = xr_logic.pstor_retrieve(db.actor, "gpt_need_hunger", 0)
+		thirst = xr_logic.pstor_retrieve(db.actor, "gpt_need_thirst", 0)
+	end
+
+	gpt_loot_needs = {
+		hunger = hunger,
+		thirst = thirst,
+		health = npc.health
+	}
+end
+
+local function gpt_end_loot_context()
+	gpt_loot_target = nil
+	gpt_loot_counts = nil
+	gpt_loot_needs = nil
+end
+
+local function gpt_wants_loot_section(section)
+	if gpt_loot_target == nil or gpt_loot_counts == nil then
+		return true
+	end
+
+	if gpt_food_sections[section] then
+		local max_food = 2
+		if gpt_loot_needs.hunger >= 75 then
+			max_food = 3
+		end
+		return gpt_loot_counts.food < max_food
+	end
+
+	if section == "energy_drink" then
+		local max_drinks = 1
+		if gpt_loot_needs.thirst >= 75 then
+			max_drinks = 2
+		end
+		return gpt_loot_counts.drinks < max_drinks
+	end
+
+	if gpt_medkit_sections[section] then
+		local max_medkits = 2
+		if gpt_loot_needs.health <= 0.55 then
+			max_medkits = 3
+		end
+		return gpt_loot_counts.medkits < max_medkits
+	end
+
+	if section == "bandage" then
+		return gpt_loot_counts.bandages < 2
+	end
+
+	-- Avoid carrying exact duplicate weapons, attachments, suits, helmets and detectors.
+	if string.sub(section, 1, 4) == "wpn_"
+		or string.sub(section, 1, 5) == "helm_"
+		or string.sub(section, 1, 9) == "detector_"
+		or string.find(section, "_outfit") ~= nil then
+		return gpt_loot_target:object(section) == nil
+	end
+
+	return true
+end
+
+local function gpt_mark_loot_taken(section)
+	if gpt_loot_counts == nil then
+		return
+	end
+
+	if gpt_food_sections[section] then
+		gpt_loot_counts.food = gpt_loot_counts.food + 1
+	elseif section == "energy_drink" then
+		gpt_loot_counts.drinks = gpt_loot_counts.drinks + 1
+	elseif gpt_medkit_sections[section] then
+		gpt_loot_counts.medkits = gpt_loot_counts.medkits + 1
+	elseif section == "bandage" then
+		gpt_loot_counts.bandages = gpt_loot_counts.bandages + 1
+	end
+end
+
 
 function check_item(npc, item)
---	printf("found item %s", item:name())
-	if lootable_table[item:section()] == true then
+	local section = item:section()
+	if lootable_table[section] == true and gpt_wants_loot_section(section) then
 		corpse_contain_any_valuable = true
 	end
 end
@@ -191,11 +308,12 @@ function evaluator_corpse:evaluate()
 
 	local corpses = release_body_manager.get_release_body_manager().release_objects_table
 
-	local nearest_corpse_dist = 400 -- Áóäåò âûáèðàòü òîëüêî òðóïû, áëèæå ÷åì ýòà äèñòàíöèÿ (ïðîâåðÿåòñÿ ïî êâàäðàòó ðàññòîÿíèÿ)
+	local nearest_corpse_dist = 400 -- ÃÃ³Ã¤Ã¥Ã² Ã¢Ã»Ã¡Ã¨Ã°Ã Ã²Ã¼ Ã²Ã®Ã«Ã¼ÃªÃ® Ã²Ã°Ã³Ã¯Ã», Ã¡Ã«Ã¨Ã¦Ã¥ Ã·Ã¥Ã¬ Ã½Ã²Ã  Ã¤Ã¨Ã±Ã²Ã Ã­Ã¶Ã¨Ã¿ (Ã¯Ã°Ã®Ã¢Ã¥Ã°Ã¿Ã¥Ã²Ã±Ã¿ Ã¯Ã® ÃªÃ¢Ã Ã¤Ã°Ã Ã²Ã³ Ã°Ã Ã±Ã±Ã²Ã®Ã¿Ã­Ã¨Ã¿)
 	local nearest_corpse_vertex = nil
 	local nearest_corpse_position = nil
 	local corpse_id	= nil
 
+	gpt_begin_loot_context(self.object)
 	for k,v in pairs(corpses) do
 		local id = v.id
 		local corpse_npc = db.storage[id] and db.storage[id].object
@@ -225,6 +343,7 @@ function evaluator_corpse:evaluate()
 		end
 	end
 
+	gpt_end_loot_context()
 	if nearest_corpse_vertex ~= nil then
 		self.a.vertex_id = nearest_corpse_vertex
 		self.a.vertex_position = nearest_corpse_position
@@ -283,8 +402,10 @@ end
 local transfer_to_npc = nil
 
 function get_item(npc, item)
-	if lootable_table[item:section()] == true then
+	local section = item:section()
+	if lootable_table[section] == true and gpt_wants_loot_section(section) then
 		npc:transfer_item(item, transfer_to_npc)
+		gpt_mark_loot_taken(section)
 	end
 end
 
@@ -299,7 +420,10 @@ function get_all_from_corpse(npc)
 	end
 
 	transfer_to_npc = npc
+	gpt_begin_loot_context(npc)
 	corpse_npc:iterate_inventory(get_item, corpse_npc)
+	gpt_end_loot_context()
+	transfer_to_npc = nil
 	
 	if math.random(100) > 20 then
 		xr_sound.set_sound_play(npc:id(), "corpse_loot_begin")
