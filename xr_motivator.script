@@ -20,13 +20,34 @@ local function gpt_consume_companion_item(npc, section, need_key, relief)
 		return false
 	end
 
+	-- eat() is exposed as a void script call, so verify the eatable's
+	-- remaining portions before treating the action as successful.
+	local ok_before, uses_before = pcall(function()
+		return item:get_remaining_uses()
+	end)
+	if not ok_before or type(uses_before) ~= "number" or uses_before <= 0 then
+		printf("[GPT_COMPANION] Cannot verify remaining uses for %s", section)
+		return false
+	end
+
 	local item_id = item:id()
 	npc:eat(item)
 
-	-- Food items are real inventory objects, unlike the temporary medkit_script.
-	local server_item = alife():object(item_id)
-	if server_item ~= nil then
-		alife():release(server_item, true)
+	local ok_after, uses_after = pcall(function()
+		return item:get_remaining_uses()
+	end)
+	if not ok_after or type(uses_after) ~= "number" or uses_after >= uses_before then
+		printf("[GPT_COMPANION] Eat was not confirmed for %s", section)
+		return false
+	end
+
+	-- Keep multi-portion food in the inventory. Release the server object
+	-- only when the engine confirms that its last portion was consumed.
+	if uses_after <= 0 then
+		local server_item = alife():object(item_id)
+		if server_item ~= nil then
+			alife():release(server_item, true)
+		end
 	end
 
 	if db.actor ~= nil and db.storage[db.actor:id()] ~= nil then
