@@ -438,6 +438,12 @@ end
 
 
 function sim_board:get_squad_target(squad)
+	if squad.player_id == "gpt_companion" then
+		local actor = alife():actor()
+		if actor ~= nil then
+			return actor
+		end
+	end
 	--printf("List of available target for %s", squad.id)
 
 	local available_targets = {}
