@@ -259,7 +259,20 @@ local function gpt_get_equipment_profile(item)
 	end
 
 	if string.sub(section, 1, 5) == "helm_" then
-		return "helmet", item_value
+		-- Helmet quality is based on configured protection, not its shop price.
+		local protection =
+			2 * gpt_read_protection(section, "strike_protection")
+			+ 2 * gpt_read_protection(section, "explosion_protection")
+			+ 2 * gpt_read_protection(section, "wound_protection")
+			+ gpt_read_protection(section, "burn_protection")
+			+ gpt_read_protection(section, "shock_protection")
+			+ 1.5 * gpt_read_protection(section, "chemical_burn_protection")
+			+ 20 * gpt_read_protection(section, "radiation_protection")
+			+ 2 * gpt_read_protection(section, "telepatic_protection")
+
+		local cost = math.max(item:cost(), 1)
+		local condition = item_value / cost
+		return "helmet", protection * condition
 	end
 
 	return nil, nil
