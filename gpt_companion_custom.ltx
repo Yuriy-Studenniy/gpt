@@ -1,7 +1,14 @@
 ; GPT AI Companion - native X-Ray companion movement scheme.
 ; The standard companion scheme follows the player and yields control during combat.
+; The generic wounded system remains active and can use the companion's own medkits.
 
 [logic]
 active = companion@gpt_follow
 
 [companion@gpt_follow]
+wounded = gpt_companion_wounded
+
+[gpt_companion_wounded]
+use_medkit = true
+autoheal = true
+enable_talk = true
