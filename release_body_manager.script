@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------
---' Для того, что бы мир не был загружен кучей трупов,
---' будем их потихоньку удалять.
+--' Г„Г«Гї ГІГ®ГЈГ®, Г·ГІГ® ГЎГ» Г¬ГЁГ° Г­ГҐ ГЎГ»Г« Г§Г ГЈГ°ГіГ¦ГҐГ­ ГЄГіГ·ГҐГ© ГІГ°ГіГЇГ®Гў,
+--' ГЎГіГ¤ГҐГ¬ ГЁГµ ГЇГ®ГІГЁГµГ®Г­ГјГЄГі ГіГ¤Г Г«ГїГІГј.
 --' Made by Distemper ----------------------------------------------------------------
 --' 11.02.08 ----------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------
@@ -26,7 +26,20 @@ local function find_nearest_obj_to_release(release_tbl)
 			printf("object_position x = "..vec_to_str(object.position))
 			local distance_to_body = actor_pos:distance_to_sqr(object.position)
 			printf("distanse = "..distance_to_body)
-			if distance_to_body > max_distanse and ((v.death_time == nil) or (time_global() > v.death_time + IDLE_AFTER_DEATH)) then
+			local reservation_active = false
+			local corpse_storage = db.storage[v.id]
+			if corpse_storage ~= nil and corpse_storage.corpse_already_selected ~= nil then
+				if xr_corpse_detection ~= nil
+					and type(xr_corpse_detection.is_corpse_reservation_active) == "function" then
+					reservation_active = xr_corpse_detection.is_corpse_reservation_active(v.id)
+				else
+					-- Fail closed: do not release a body while reservation ownership cannot be checked.
+					reservation_active = true
+				end
+			end
+
+			if not reservation_active and distance_to_body > max_distanse
+				and ((v.death_time == nil) or (time_global() > v.death_time + IDLE_AFTER_DEATH)) then
 				max_distanse = distance_to_body
 				pos_in_table = k
 			end
@@ -40,11 +53,11 @@ local RB_manager = nil
 class "Crelease_body"
 
 function Crelease_body:__init()
-	self.release_objects_table = {} -- таблица "СТЕК" трупов
-	self.keep_items_table = {} -- таблица квестовых предметов
- 	self.body_max_count = 15 -- количество тел которое одновременно может находится в игре
-	self.current_object_id = 0 -- id только что убитого npc
-	--' Итерируемся по списку квестовых итемов.
+	self.release_objects_table = {} -- ГІГ ГЎГ«ГЁГ¶Г  "Г‘Г’Г…ГЉ" ГІГ°ГіГЇГ®Гў
+	self.keep_items_table = {} -- ГІГ ГЎГ«ГЁГ¶Г  ГЄГўГҐГ±ГІГ®ГўГ»Гµ ГЇГ°ГҐГ¤Г¬ГҐГІГ®Гў
+ 	self.body_max_count = 15 -- ГЄГ®Г«ГЁГ·ГҐГ±ГІГўГ® ГІГҐГ« ГЄГ®ГІГ®Г°Г®ГҐ Г®Г¤Г­Г®ГўГ°ГҐГ¬ГҐГ­Г­Г® Г¬Г®Г¦ГҐГІ Г­Г ГµГ®Г¤ГЁГІГ±Гї Гў ГЁГЈГ°ГҐ
+	self.current_object_id = 0 -- id ГІГ®Г«ГјГЄГ® Г·ГІГ® ГіГЎГЁГІГ®ГЈГ® npc
+	--' Г€ГІГҐГ°ГЁГ°ГіГҐГ¬Г±Гї ГЇГ® Г±ГЇГЁГ±ГЄГі ГЄГўГҐГ±ГІГ®ГўГ»Гµ ГЁГІГҐГ¬Г®Гў.
 	local snd_ini = ini_file("misc\\death_generic.ltx")
 	if not snd_ini:section_exist("keep_items") then
 		abort("There is no section [keep_items] in death_generic.ltx")
@@ -105,12 +118,12 @@ end
 function Crelease_body:inspection_result(obj)
 	for k,v in pairs(self.keep_items_table) do
 		if obj:object(self.keep_items_table[k]) ~= nil then
-			printf("Object << "..obj:name().." >> presence_in_keep_items_table") -- в инвентаре есть квестовый предмет
+			printf("Object << "..obj:name().." >> presence_in_keep_items_table") -- Гў ГЁГ­ГўГҐГ­ГІГ Г°ГҐ ГҐГ±ГІГј ГЄГўГҐГ±ГІГ®ГўГ»Г© ГЇГ°ГҐГ¤Г¬ГҐГІ
 			return false
 		end
 	end
 	if get_object_story_id(obj:id()) ~= nil then
-		printf("Object << "..obj:name().." >> presence_in_story") -- помечен как сюжетный
+		printf("Object << "..obj:name().." >> presence_in_story") -- ГЇГ®Г¬ГҐГ·ГҐГ­ ГЄГ ГЄ Г±ГѕГ¦ГҐГІГ­Г»Г©
 		return false
 	end
 	if self:check_for_known_info(obj) then
