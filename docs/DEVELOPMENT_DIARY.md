@@ -483,3 +483,10 @@
 - API проверен в `lua_help.script`: `level.object_by_id(number)`, `game_object:alive()`, `motivation_action_manager(game_object*)`, `initialized()` и `current_action_id()` присутствуют в целевом Lua help. Само `is_under_corpse_detection()` уже существовало и сравнивает текущий action ID с `xr_actions_id.corpse_exist`.
 - Структурная проверка Lua блоков для `xr_corpse_detection.script` и `release_body_manager.script` прошла без несбалансированных `function/if/for/while/do/repeat` блоков. Полноценного Lua parser/CoP runtime здесь нет; правка не проверена в игре.
 - Риск для игрового прогона: подтвердить, что `level.object_by_id()` действительно nil для offline stalker и что `current_action_id()` совпадает с `xr_actions_id.corpse_exist` во время поиска. Отдельно проверить, что кратковременное переключение action не снимает reservation слишком рано.
+
+### Проверка семантики `get_ammo_total()` для подбора патронов
+
+- В целевой Lua help `get_ammo_total()` привязан к `CScriptGameObject::GetSuitableAmmoTotal()`, а `get_ammo_in_magazine()` — к `GetAmmoElapsed()`.
+- В просмотренном X-Ray 1.6.02-derived `CWeapon::GetSuitableAmmoTotal()` возвращает `iAmmoElapsed` плюс сумму всех подходящих типов патронов из belt и ruck. `GetAmmoElapsed()` возвращает количество патронов в текущем магазине. Следовательно, `get_ammo_total() - get_ammo_in_magazine()` корректно даёт запас compatible rounds вне магазина.
+- `gpt_check_weapon_ammo()` отдельно проверяет, входит ли запрашиваемая секция в `ammo_class` конкретного оружия, а target reserve вычисляет из `ammo_mag_size` (2 магазина с clamp 4..120). По одному трупу принимается максимум одна коробка каждого ammo section через `gpt_loot_ammo_taken`.
+- Вывод: API-семантика текущего расчёта reserve подтверждена; исправление не требуется. Это статическая сверка исходника/привязок, не проверка фактической добычи в игре.
