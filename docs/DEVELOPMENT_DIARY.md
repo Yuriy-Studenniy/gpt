@@ -315,3 +315,48 @@
 - Коммит: `d8ae7fae3976453b6f6afeb0bcd50a214887224e` — Skip offline simulation for empty companion squad.
 - После изменения повторно выполнена структурная проверка блоков для четырёх изменённых Lua-файлов; все четыре прошли. Это не Lua compiler и не runtime check.
 
+
+## 2026-11-08 — Повторный аудит NPC lifecycle, инвентарных callbacks и рейтинга экипировки
+
+### Подтверждение класса companion squad и offline-пути
+
+- Проверен `class_registrator.script`: класс `online_offline_group_s` зарегистрирован как `sim_squad_scripted.sim_squad_scripted`. Следовательно, созданная через A-Life секцию `gpt_companion_squad`, наследующую `online_offline_group`, использует именно `sim_squad_scripted`, где расположен `gpt_companion_update_needs()`.
+- В `squad_descr.ltx` у `gpt_companion_squad` заданы `gpt_companion = true`, `npc = gpt_companion_main`, `npc_in_squad = 1, 1` и уникальный `story_id`.
+- `sim_board:get_squad_target()` имеет companion-specific ветку и возвращает A-Life объект игрока. Это согласуется с ролью спутника как follower в текущей главе; независимые цели и автономная жизнь остаются последующими этапами.
+- `sim_squad_scripted:STATE_Write/STATE_Read` сохраняют состояние группы и её цели. Потребности пока хранятся отдельно — в PSTOR игрока; `actor_binder:save/load` вызывает `xr_logic.pstor_save_all/load_all`. Перенос backend на NPC или squad сейчас не выполняется: он потребует отдельного совместимого формата и миграции сохранений.
+- В `sim_squad_scripted:update()` потребности обновляются до раннего выхода для пустого companion squad. Пустой остаточный squad не запускает generic offline target/action цикл.
+
+### Исправления текущего цикла
+
+- В `bind_stalker.script` проверка конфликта `group_id` теперь выполняется до `alife():create()` нового squad. Если спутник уже принадлежит другой группе, setup прекращается, не оставляя новый пустой `gpt_companion_squad`.
+- В `xr_corpse_detection.script` обычные NPC теперь проходят vanilla one-pass ветку `get_item()` до вычисления companion equipment profile. Для них companion scoring не запускается.
+- Исправлен поиск подходящих патронов. Прежний прямой callback `gpt_check_weapon_ammo` получал первым параметром владельца inventory, а не строку секции патронов; поэтому сравнение `ammo_sections[i] == wanted_section` не могло сработать. Теперь callback-замыкание захватывает `section` и передаёт в проверку реальный предмет: `iterate_inventory(function(owner, item) gpt_check_weapon_ammo(section, item) end, gpt_loot_target)`.
+- В рейтинге шлемов цена больше не выступает заменителем защитных свойств: балл теперь формируется из части конфигурационных protection-полей и текущего состояния предмета. Это промежуточная эвристика, а не окончательная модель защиты.
+- Сверены целевые Lua exports для `iterate_inventory`, `eat`, `transfer_item`, `parent`, `get_ammo_total`, `get_ammo_in_magazine`, `accessible`, `commander_id`, `CTime:get/set/diffSec`. Наличие сигнатуры в `lua_help.script` подтверждает доступность binding в справочнике целевой сборки, но не заменяет runtime-проверку конкретного вызова.
+
+### Ограничения, которые нельзя скрывать
+
+- Рейтинг оружия всё ещё в основном использует `cost × condition` внутри группы типа оружия. Это не оценка фактической боевой эффективности. Для следующей итерации нужно учитывать пригодность под стиль боя, дистанцию, характеристики оружия и доступный боезапас, не сводя решение к цене.
+- Балл костюмов и шлемов учитывает только часть конфигурационных параметров. Он пока не читает весь профиль защиты, включая `hit_fraction_actor` и `bones_koeff_protection`; поэтому сравнение брони/шлемов следует считать предварительным. Нельзя заявлять, что текущий рейтинг корректно моделирует пулестойкость NPC.
+- Проверка callback-аргументов сверена с `lua_help.script` и документацией X-Ray SDK, где callback описан как `(owner, item)`, а второй параметр `iterate_inventory` — как контекстный object, не пользовательские данные callback. Для исходной CoP-сборки локальный export указывает второй параметр общим типом `object`; поэтому здесь важен именно порядок callback-аргументов, а не предположение о более узком типе второго параметра. Справочник: https://xray-forge.github.io/xrf-xray16-sdk/api/types/classes/game_object.html
+- В руководстве по CoP `outfit.ltx` отдельно описаны `hit_fraction_actor` и `bones_koeff_protection` для характеристик защиты; текущая эвристика эти параметры не разбирает. Руководство использовано как дополнительная техническая подсказка, не как доказательство точного урона companion NPC: https://ap-pro.ru/forums/topic/1811-cop-razbor-fayla-outfitltx/
+- Не подтверждены в игре: поведение `item:parent()` сразу после `transfer_item`, точный timing corpse action/finalize, фактические параметры защиты NPC, перенос между online/offline, death/level-transition recovery.
+
+### Коррекция двух ложных тревог во время аудита
+
+- Сначала было предположено, что `squad:squad_members()` возвращает только записи с `object`, а использование `member.id` ошибочно. Повторная сверка с ванильным `sim_squad_scripted.script` показала, что `id` штатно используется во множестве функций, а `sim_board` обращается к `object`, когда ему нужен сам wrapper. Оба временных изменения на `member.object` отменены; рабочий код использует `member.id`.
+- Также было предположено, что `level.vertex_in_direction()` недоступна, потому что такая же функция есть как метод `game_object`. В namespace-разделе локального `lua_help.script` найдена отдельная функция `level.vertex_in_direction()` с той же сигнатурой. Временная замена на метод `actor` отменена; исходный корректный вызов восстановлен.
+- Эти два подозрения не являются исправленными багами. Они зафиксированы здесь, чтобы будущая работа не повторяла неверный вывод.
+
+### Коммиты игрового кода этой серии
+
+- `89d4be25563d15e884adcabdde9ae5f6d222cb37` — не создавать пустой squad при конфликте владения группой.
+- `f14628526f2ea88f65c26dd7e60d138de89ebf58` — отделить vanilla corpse loot path от companion scoring.
+- `a8fe9fa56de2c2a67a40e8908133ed03ec5952fc` — оценивать шлемы по части защитных полей и состоянию.
+- `d53d9ac289cdccab37f1327164cc39b67c81a203` — исправить callback проверки совместимых боеприпасов.
+- `19c4c85f4c8e5a7e9c14800b5b42184710cbc8f8` — восстановить подтверждённый вызов `level.vertex_in_direction()` после ложной тревоги.
+
+### Статическая проверка
+
+- Повторная проверка парности блоков Lua выполнена для `bind_stalker.script`, `sim_squad_scripted.script`, `xr_motivator.script` и `xr_corpse_detection.script`. После удаления комментариев и строковых литералов scanner не обнаружил лишних или незакрытых `function/if/for/while/do/repeat/end/until`.
+- Это не полноценная компиляция Lua и не тест в X-Ray. Код в игре по-прежнему не проверялся; глава NPC game foundation остаётся открытой.
