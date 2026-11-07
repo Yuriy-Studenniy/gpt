@@ -727,13 +727,6 @@ end
 function get_all_from_corpse(npc)
 	printf("GET ALL FROM CORPSE")
 
-	local corpse_npc_id = db.storage[npc:id()].corpse_detection.selected_corpse_id
-	local corpse_npc = db.storage[corpse_npc_id] and db.storage[corpse_npc_id].object
-
-	if corpse_npc == nil then
-		return
-	end
-
 	local npc_storage = db.storage[npc:id()]
 	local corpse_detection = npc_storage and npc_storage.corpse_detection
 	local corpse_npc_id = corpse_detection and corpse_detection.selected_corpse_id
