@@ -1112,4 +1112,11 @@
 		<class>jup_b6_freedom_stalker_1</class>
    </character>
 
+
+	<!-- GPT AI Companion -->
+	<character id="gpt_companion_main">
+		<class>sim_default_stalker_2</class>
+		<specific_character>gpt_companion_main</specific_character>
+	</character>
+
 </xml>
