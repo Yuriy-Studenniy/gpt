@@ -1,7 +1,7 @@
 local desired_distance = 1
 local min_distance = 1
 
-local keep_state_min_time = 1000 -- переключившись в состояние (бег, ходьба, спринт), не переключаться в другое N ms
+local keep_state_min_time = 1000 -- ГЇГҐГ°ГҐГЄГ«ГѕГ·ГЁГўГёГЁГ±Гј Гў Г±Г®Г±ГІГ®ГїГ­ГЁГҐ (ГЎГҐГЈ, ГµГ®Г¤ГјГЎГ , Г±ГЇГ°ГЁГ­ГІ), Г­ГҐ ГЇГҐГ°ГҐГЄГ«ГѕГ·Г ГІГјГ±Гї Гў Г¤Г°ГіГЈГ®ГҐ N ms
 
 local dist_walk = 4 -- < dist_run
 local dist_run = 20
@@ -9,7 +9,7 @@ local dist_run = 20
 
 local sound_wait = "weather,state"
 
--- Модели поведения:
+-- ГЊГ®Г¤ГҐГ«ГЁ ГЇГ®ГўГҐГ¤ГҐГ­ГЁГї:
 beh_walk_simple = 0
 beh_walk_near = 1
 beh_walk_ignore = 2
@@ -68,7 +68,7 @@ function action_companion_activity:beh_walk_simple()
 			dist_from_assist_pt_to_actor >= desired_distance * 2) then
 		select_new_pt = true
 	end
-	-- 1. Если мы находимся за большим радиусом - необходимо выбрать новую точку
+	-- 1. Г…Г±Г«ГЁ Г¬Г» Г­Г ГµГ®Г¤ГЁГ¬Г±Гї Г§Г  ГЎГ®Г«ГјГёГЁГ¬ Г°Г Г¤ГЁГіГ±Г®Г¬ - Г­ГҐГ®ГЎГµГ®Г¤ГЁГ¬Г® ГўГ»ГЎГ°Г ГІГј Г­Г®ГўГіГѕ ГІГ®Г·ГЄГі
 	if select_new_pt then
 		self.assist_point = select_position(self.object, self.st)
 		if not self.assist_point then
@@ -78,7 +78,7 @@ function action_companion_activity:beh_walk_simple()
 		return
 	end
 
-	-- 2. Двигаемся на точку: если точка далеко - бежим, иначе идем
+	-- 2. Г„ГўГЁГЈГ ГҐГ¬Г±Гї Г­Г  ГІГ®Г·ГЄГі: ГҐГ±Г«ГЁ ГІГ®Г·ГЄГ  Г¤Г Г«ГҐГЄГ® - ГЎГҐГ¦ГЁГ¬, ГЁГ­Г Г·ГҐ ГЁГ¤ГҐГ¬
 	self.object:set_path_type(game_object.level_path)
 	self.object:set_dest_level_vertex_id(self.assist_point)
 
@@ -90,8 +90,8 @@ function action_companion_activity:beh_walk_simple()
 	local new_state
 
 	if self.object:level_vertex_id() == self.assist_point then
-		-- Уже пришли на точку отхода, разрешить еще раз начать отход
-		-- (случай, когда игрок подошел слишком близко к ассистенту)
+		-- Г“Г¦ГҐ ГЇГ°ГЁГёГ«ГЁ Г­Г  ГІГ®Г·ГЄГі Г®ГІГµГ®Г¤Г , Г°Г Г§Г°ГҐГёГЁГІГј ГҐГ№ГҐ Г°Г Г§ Г­Г Г·Г ГІГј Г®ГІГµГ®Г¤
+		-- (Г±Г«ГіГ·Г Г©, ГЄГ®ГЈГ¤Г  ГЁГЈГ°Г®ГЄ ГЇГ®Г¤Г®ГёГҐГ« Г±Г«ГЁГёГЄГ®Г¬ ГЎГ«ГЁГ§ГЄГ® ГЄ Г Г±Г±ГЁГ±ГІГҐГ­ГІГі)
 		--self.dir_approaching = true
 
 		new_state = "threat"
@@ -119,7 +119,7 @@ function action_companion_activity:beh_walk_simple()
 		self.last_state = new_state
 	end
 
-	-- 4. Если стоим на точке - петь песенки и прочую херню
+	-- 4. Г…Г±Г«ГЁ Г±ГІГ®ГЁГ¬ Г­Г  ГІГ®Г·ГЄГҐ - ГЇГҐГІГј ГЇГҐГ±ГҐГ­ГЄГЁ ГЁ ГЇГ°Г®Г·ГіГѕ ГµГҐГ°Г­Гѕ
 --	xr_sound.set_sound(self.object, sound_wait)
 end
 
@@ -132,7 +132,7 @@ function action_companion_activity:beh_wait_simple()
 		self.last_state = new_state
 	end
 
-	-- 4. Если стоим на точке - петь песенки и прочую херню
+	-- 4. Г…Г±Г«ГЁ Г±ГІГ®ГЁГ¬ Г­Г  ГІГ®Г·ГЄГҐ - ГЇГҐГІГј ГЇГҐГ±ГҐГ­ГЄГЁ ГЁ ГЇГ°Г®Г·ГіГѕ ГµГҐГ°Г­Гѕ
 --	xr_sound.set_sound(self.object, sound_wait)
 end
 
@@ -149,7 +149,7 @@ function action_companion_activity:finalize()
 	action_base.finalize(self)
 end
 
---' Выбор новой позиции
+--' Г‚Г»ГЎГ®Г° Г­Г®ГўГ®Г© ГЇГ®Г§ГЁГ¶ГЁГЁ
 function select_position(npc, st)
 	local node_1_vertex_id = nil
 	local node_1_distance = nil
@@ -158,24 +158,24 @@ function select_position(npc, st)
 
 	local actor = db.actor
 
-	-- проверяем точку слева от актера
+	-- ГЇГ°Г®ГўГҐГ°ГїГҐГ¬ ГІГ®Г·ГЄГі Г±Г«ГҐГўГ  Г®ГІ Г ГЄГІГҐГ°Г 
 	desired_direction = vector_rotate_y(actor:direction(), math.random(50,60) )
 	node_1_vertex_id = level.vertex_in_direction(actor:level_vertex_id(),
 		desired_direction,
 		desired_distance)
-	if npc:accessible(node_1_vertex_id) ~= true or node_1_vertex_id == actor:level_vertex_id() then
+	if node_1_vertex_id == nil or npc:accessible(node_1_vertex_id) ~= true or node_1_vertex_id == actor:level_vertex_id() then
 		node_1_vertex_id = nil
 	end
-	-- проверяем точку справа от актера
+	-- ГЇГ°Г®ГўГҐГ°ГїГҐГ¬ ГІГ®Г·ГЄГі Г±ГЇГ°Г ГўГ  Г®ГІ Г ГЄГІГҐГ°Г 
 	desired_direction = vector_rotate_y(actor:direction(), -math.random(50,60) )
 	node_2_vertex_id = level.vertex_in_direction (  actor:level_vertex_id(),
 		desired_direction,
 		desired_distance )
-	if npc:accessible(node_2_vertex_id) ~= true or node_2_vertex_id == actor:level_vertex_id() then
+	if node_2_vertex_id == nil or npc:accessible(node_2_vertex_id) ~= true or node_2_vertex_id == actor:level_vertex_id() then
 		node_2_vertex_id = nil
 	end
 
-	-- Проверяем растояния до точек
+	-- ГЏГ°Г®ГўГҐГ°ГїГҐГ¬ Г°Г Г±ГІГ®ГїГ­ГЁГї Г¤Г® ГІГ®Г·ГҐГЄ
 	if node_1_vertex_id ~= nil then
 		node_1_distance = npc:position():distance_to_sqr(level.vertex_position(node_1_vertex_id))
 	else
@@ -187,9 +187,9 @@ function select_position(npc, st)
 		node_2_distance = -1
 	end
 
-	-- Выбираем ближайшую из существующих
+	-- Г‚Г»ГЎГЁГ°Г ГҐГ¬ ГЎГ«ГЁГ¦Г Г©ГёГіГѕ ГЁГ§ Г±ГіГ№ГҐГ±ГІГўГіГѕГ№ГЁГµ
 	if node_1_distance == -1 and node_2_distance == -1 then
-		--' Не смогли найти точку, ругаться
+		--' ГЌГҐ Г±Г¬Г®ГЈГ«ГЁ Г­Г Г©ГІГЁ ГІГ®Г·ГЄГі, Г°ГіГЈГ ГІГјГ±Гї
 		return nil
 	end
 	if node_1_distance == -1 then
@@ -238,7 +238,7 @@ function add_to_binder(npc, ini, scheme, section, storage)
 	new_action:add_effect (world_property(properties["state_mgr_logic_active"], false))
 	manager:add_action(operators["action_companion"], new_action)
 
-	-- Зарегистрировать все actions, в которых должен быть вызван метод reset_scheme при изменении настроек схемы:
+	-- Г‡Г Г°ГҐГЈГЁГ±ГІГ°ГЁГ°Г®ГўГ ГІГј ГўГ±ГҐ actions, Гў ГЄГ®ГІГ®Г°Г»Гµ Г¤Г®Г«Г¦ГҐГ­ ГЎГ»ГІГј ГўГ»Г§ГўГ Г­ Г¬ГҐГІГ®Г¤ reset_scheme ГЇГ°ГЁ ГЁГ§Г¬ГҐГ­ГҐГ­ГЁГЁ Г­Г Г±ГІГ°Г®ГҐГЄ Г±ГµГҐГ¬Г»:
 	xr_logic.subscribe_action_for_events(npc, storage, new_action)
 
 	new_action = manager:action(xr_actions_id.alife)
@@ -247,6 +247,6 @@ end
 
 function set_scheme(object, ini, scheme, section)
 	local st = xr_logic.assign_storage_and_bind(object, ini, scheme, section)
-	st.logic				= xr_logic.cfg_get_switch_conditions(ini, section, npc)
+	st.logic				= xr_logic.cfg_get_switch_conditions(ini, section, object)
 	st.behavior = beh_walk_simple
 end
