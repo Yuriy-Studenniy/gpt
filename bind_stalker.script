@@ -101,6 +101,19 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		return nil, "squad_registration_not_confirmed"
 	end
 
+	local membership_ok, membership_found = pcall(function()
+		for member in squad:squad_members() do
+			if member.id == companion.id then
+				return true
+			end
+		end
+		return false
+	end)
+	if not membership_ok or not membership_found then
+		printf("[GPT_COMPANION] ERROR: squad membership could not be confirmed")
+		return nil, "squad_membership_not_confirmed"
+	end
+
 	local relation_ok, relation_error = pcall(function()
 		squad:set_squad_relation()
 	end)
@@ -185,7 +198,12 @@ local function gpt_update_companion_setup(binder)
 	end
 
 	binder.gpt_companion_setup_attempts = (binder.gpt_companion_setup_attempts or 0) + 1
-	local companion_id, setup_status = ensure_gpt_companion_spawned(binder.object)
+	local call_ok, companion_id, setup_status = pcall(ensure_gpt_companion_spawned, binder.object)
+	if not call_ok then
+		setup_status = "setup_exception: " .. tostring(companion_id)
+		companion_id = nil
+	end
+
 	if companion_id ~= nil then
 		binder.gpt_companion_setup_complete = true
 		binder.gpt_companion_setup_retry_at = nil
