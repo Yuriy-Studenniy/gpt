@@ -1,4 +1,4 @@
-; Здесь содержатся дескрипшены сквадов, которые потом можно создавать используя спец функции.
+; Г‡Г¤ГҐГ±Гј Г±Г®Г¤ГҐГ°Г¦Г ГІГ±Гї Г¤ГҐГ±ГЄГ°ГЁГЇГёГҐГ­Г» Г±ГЄГўГ Г¤Г®Гў, ГЄГ®ГІГ®Г°Г»ГҐ ГЇГ®ГІГ®Г¬ Г¬Г®Г¦Г­Г® Г±Г®Г§Г¤Г ГўГ ГІГј ГЁГ±ГЇГ®Г«ГјГ§ГіГї Г±ГЇГҐГ¶ ГґГіГ­ГЄГ¶ГЁГЁ.
 #include "squad_descr_pripyat.ltx"
 #include "squad_descr_jupiter.ltx"
 #include "squad_descr_zaton.ltx"
@@ -578,3 +578,12 @@ npc = conrack_selo_stalker, conrack_selo_stalker, conrack_selo_stalker, conrack_
 target_smart = conrack_selo_smart
 spawn_point =  conrack_selo_smart_st_3_stay
 story_id = conrack_test_squad
+;****************************************************************
+; GPT AI Companion - persistent one-member squad (no Smart Terrain)
+;****************************************************************
+[gpt_companion_squad]:online_offline_group
+faction = stalker
+behaviour = stalker
+npc = gpt_companion_main
+npc_in_squad = 1, 1
+story_id = gpt_companion_squad
