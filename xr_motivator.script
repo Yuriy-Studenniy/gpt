@@ -56,8 +56,14 @@ local function gpt_consume_companion_item(npc, section, need_name, relief)
 		return false
 	end
 
-	local consumed = false
-	if uses_supported then
+	-- Check inventory ownership/count first: a one-shot item may already
+	-- have been removed, so its old Lua wrapper must not be queried again.
+	local item_count_after = gpt_count_companion_inventory_section(npc, section)
+	local consumed = item_count_after < item_count_before
+
+	-- For a multi-use item that remains in inventory, an available
+	-- OpenXRay getter may confirm that its uses count actually decreased.
+	if not consumed and uses_supported then
 		local ok_after, uses_after = pcall(function()
 			return item:get_remaining_uses()
 		end)
@@ -67,13 +73,8 @@ local function gpt_consume_companion_item(npc, section, need_name, relief)
 	end
 
 	-- Vanilla CoP food/drink items are ordinary consumables: the engine
-	-- removes the item after use. A reduced section count confirms that
-	-- path without relying on an OpenXRay-only getter. For custom
-	-- multi-use items, this fallback deliberately does not guess.
-	local item_count_after = gpt_count_companion_inventory_section(npc, section)
-	if item_count_after < item_count_before then
-		consumed = true
-	end
+	-- removes the item after use. For custom multi-use items without the
+	-- getter, this fallback deliberately does not guess.
 
 	if not consumed then
 		printf("[GPT_COMPANION] Eat was not confirmed for %s", section)
