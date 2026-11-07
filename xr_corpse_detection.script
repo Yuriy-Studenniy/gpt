@@ -214,18 +214,24 @@ local function gpt_get_equipment_profile(item)
 	end
 
 	if isWeapon(item) then
+		-- Read weapon class metadata from the config. Some CoP sections do not
+		-- define ef_main_weapon_type; calling the C++ getter on those can assert.
+		local ini = system_ini()
 		local weapon_type = 255
-		local ok_main, main_type = pcall(function()
-			return item:get_main_weapon_type()
-		end)
-		if ok_main and type(main_type) == "number" and main_type ~= 255 then
-			weapon_type = main_type
-		else
-			local ok_type, fallback_type = pcall(function()
-				return item:get_weapon_type()
+		if ini:line_exist(section, "ef_main_weapon_type") then
+			local ok, value = pcall(function()
+				return ini:r_u32(section, "ef_main_weapon_type")
 			end)
-			if ok_type and type(fallback_type) == "number" and fallback_type ~= 255 then
-				weapon_type = fallback_type
+			if ok and type(value) == "number" then
+				weapon_type = value
+			end
+		end
+		if weapon_type == 255 and ini:line_exist(section, "ef_weapon_type") then
+			local ok, value = pcall(function()
+				return ini:r_u32(section, "ef_weapon_type")
+			end)
+			if ok and type(value) == "number" then
+				weapon_type = value
 			end
 		end
 		return "weapon_" .. tostring(weapon_type), item_value
