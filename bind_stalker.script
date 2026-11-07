@@ -103,7 +103,9 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 
 	local membership_ok, membership_found = pcall(function()
 		for member in squad:squad_members() do
-			if member.id == companion.id then
+			-- Vanilla sim_board iterates member records; the ALife object is member.object.
+			local member_object = member and member.object
+			if member_object ~= nil and member_object.id == companion.id then
 				return true
 			end
 		end
