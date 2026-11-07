@@ -700,12 +700,6 @@ function sim_squad_scripted:get_squad_community()
 	end
 	return squad_community
 end
-	local squad_community = squad_community_by_behaviour[self.player_id]
-	if squad_community == nil then
-		abort("squad community is 'nil' for player_id [%s]", self.player_id)
-	end
-	return squad_community
-end
 
 
 --***********************************************************************************************
