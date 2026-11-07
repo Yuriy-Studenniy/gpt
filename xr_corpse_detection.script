@@ -226,6 +226,7 @@ local function gpt_begin_loot_context(npc)
 		gpt_loot_target = nil
 		gpt_loot_counts = nil
 		gpt_loot_needs = nil
+		gpt_loot_ammo_taken = nil
 		return
 	end
 
@@ -266,6 +267,15 @@ local function gpt_wants_loot_section(section)
 			max_food = 3
 		end
 		return gpt_loot_counts.food < max_food
+	end
+
+	if section == "vodka" then
+		-- Alcohol is not treated as hydration; there is no coping/alcohol motive yet.
+		return false
+	end
+
+	if string.sub(section, 1, 5) == "drug_" then
+		return gpt_loot_target:object(section) == nil
 	end
 
 	if section == "energy_drink" then
