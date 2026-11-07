@@ -487,7 +487,7 @@ local function gpt_wants_loot_section(section, item)
 	return true
 end
 
-local function gpt_mark_loot_taken(section, item)
+local function gpt_mark_loot_taken(section, equipment_group)
 	if gpt_loot_counts == nil then
 		return
 	end
@@ -496,7 +496,6 @@ local function gpt_mark_loot_taken(section, item)
 		gpt_loot_ammo_taken[section] = true
 	end
 
-	local equipment_group = gpt_get_equipment_profile(item)
 	if equipment_group ~= nil then
 		gpt_loot_equipment_taken[equipment_group] = true
 	end
@@ -759,7 +758,7 @@ function get_item(npc, item)
 		end
 
 		if transfer_confirmed then
-			gpt_mark_loot_taken(section, item)
+			gpt_mark_loot_taken(section, equipment_group)
 		else
 			printf("[GPT_COMPANION] Item transfer was not confirmed for %s", section)
 		end
