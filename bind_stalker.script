@@ -54,6 +54,11 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		printf("[GPT_COMPANION] Registered companion %s in squad %s", tostring(companion.id), tostring(squad.id))
 	end
 
+	if companion.group_id ~= squad.id then
+		printf("[GPT_COMPANION] ERROR: companion was not attached to its A-Life squad")
+		return nil
+	end
+
 	if not squad.gpt_companion_sound_registered then
 		squad.sound_manager:register_npc(companion.id)
 		squad.gpt_companion_sound_registered = true
