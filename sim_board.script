@@ -129,11 +129,6 @@ simulation_activities = {
 					},
 			actor = { prec = function(squad, target) return in_time_interval(19,6) and simulation_objects.sim_dist_to(squad, target) <= 150 end }
 	},
-	gpt_companion = {
-			squad = nil,
-			smart = nil,
-			actor = { prec = function(squad, target) return true end }
-	},
 	monster_special = {
 			squad = nil,
 			smart = { 	lair	 = { prec = function() return true end }
@@ -438,7 +433,7 @@ end
 
 
 function sim_board:get_squad_target(squad)
-	if squad.player_id == "gpt_companion" then
+	if squad.gpt_companion then
 		local actor = alife():actor()
 		if actor ~= nil then
 			return actor
