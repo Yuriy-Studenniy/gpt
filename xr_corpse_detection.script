@@ -492,6 +492,7 @@ local function gpt_mark_loot_taken(section, item)
 		return
 	end
 
+	local equipment_group = gpt_get_equipment_profile(item)
 	if string.sub(section, 1, 5) == "ammo_" and gpt_loot_ammo_taken ~= nil then
 		gpt_loot_ammo_taken[section] = true
 	end
