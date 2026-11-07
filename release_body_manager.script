@@ -31,7 +31,10 @@ local function find_nearest_obj_to_release(release_tbl)
 			if corpse_storage ~= nil and corpse_storage.corpse_already_selected ~= nil then
 				if xr_corpse_detection ~= nil
 					and type(xr_corpse_detection.is_corpse_reservation_active) == "function" then
-					reservation_active = xr_corpse_detection.is_corpse_reservation_active(v.id)
+					local check_ok, is_active = pcall(function()
+						return xr_corpse_detection.is_corpse_reservation_active(v.id)
+					end)
+					reservation_active = not check_ok or is_active == true
 				else
 					-- Fail closed: do not release a body while reservation ownership cannot be checked.
 					reservation_active = true
