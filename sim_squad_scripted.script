@@ -312,6 +312,11 @@ function sim_squad_scripted:update()
 	-- The helper itself throttles writes by in-game elapsed time.
 	if self.gpt_companion == true then
 		gpt_companion_update_needs(self)
+		-- A failed member registration can leave an empty squad object behind.
+		-- Do not run generic A-Life target selection for a companion with no member.
+		if self:commander_id() == nil then
+			return
+		end
 	end
 
 
