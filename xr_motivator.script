@@ -436,7 +436,7 @@ function motivator_binder:update(delta)
 	local actor = db.actor
 
 	-- GPT AI Companion: check food and drink needs periodically while online.
-	if object_alive and get_object_story_id(object:id()) == "gpt_companion_main" then
+	if object_alive and get_story_objects_registry():get_story_id(object:id()) == "gpt_companion_main" then
 		local consume_now = time_global()
 		if self.gpt_companion_consumption_last_update == nil
 			or consume_now - self.gpt_companion_consumption_last_update >= 15000 then
