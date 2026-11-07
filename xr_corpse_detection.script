@@ -346,6 +346,32 @@ local gpt_medkit_sections = {
 	["medkit_scientic"] = true
 }
 
+-- Special/unique items stay with their intended owner or quest chain.
+-- This denylist applies only to the companion; vanilla NPC looting remains unchanged.
+local gpt_companion_protected_sections = {
+	["wpn_pm_actor"] = true,
+	["wpn_sig550_luckygun"] = true,
+	["wpn_pkm_zulus"] = true,
+	["wpn_wincheaster1300_trapper"] = true,
+	["wpn_desert_eagle_nimble"] = true,
+	["wpn_groza_nimble"] = true,
+	["wpn_mp5_nimble"] = true,
+	["wpn_sig220_nimble"] = true,
+	["wpn_spas12_nimble"] = true,
+	["wpn_svd_nimble"] = true,
+	["wpn_svu_nimble"] = true,
+	["wpn_usp_nimble"] = true,
+	["wpn_vintorez_nimble"] = true,
+	["wpn_g36_nimble"] = true,
+	["wpn_fn2000_nimble"] = true,
+	["wpn_protecta_nimble"] = true,
+	["stalker_outfit_barge"] = true,
+	["helm_respirator_joker"] = true,
+	["helm_hardhat_snag"] = true,
+	["wpn_ak74u_snag"] = true,
+	["wpn_fort_snag"] = true
+}
+
 local function gpt_count_loot_inventory(npc, item)
 	if gpt_loot_counts == nil then
 		return
@@ -358,8 +384,6 @@ local function gpt_count_loot_inventory(npc, item)
 		gpt_loot_counts.drinks = gpt_loot_counts.drinks + 1
 	elseif gpt_medkit_sections[section] then
 		gpt_loot_counts.medkits = gpt_loot_counts.medkits + 1
-	elseif section == "bandage" then
-		gpt_loot_counts.bandages = gpt_loot_counts.bandages + 1
 	elseif section == "grenade_f1" or section == "grenade_rgd5" then
 		gpt_loot_counts.grenades = gpt_loot_counts.grenades + 1
 	end
@@ -393,7 +417,7 @@ local function gpt_begin_loot_context(npc)
 	end
 
 	gpt_loot_target = npc
-	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, bandages = 0, grenades = 0}
+	gpt_loot_counts = {food = 0, drinks = 0, medkits = 0, grenades = 0}
 	gpt_loot_ammo_taken = {}
 	gpt_loot_equipment_best = {}
 	gpt_loot_equipment_taken = {}
@@ -461,8 +485,10 @@ local function gpt_wants_loot_section(section, item)
 		return gpt_loot_counts.medkits < max_medkits
 	end
 
-	if section == "bandage" then
-		return gpt_loot_counts.bandages < 2
+	-- Bandages are not used by the companion's current wounded scheme.
+	-- Do not collect supplies that it cannot consume.
+	if section == "bandage" or gpt_companion_protected_sections[section] == true then
+		return false
 	end
 
 	if section == "grenade_f1" or section == "grenade_rgd5" then
@@ -527,8 +553,6 @@ local function gpt_mark_loot_taken(section, equipment_group)
 		gpt_loot_counts.drinks = gpt_loot_counts.drinks + 1
 	elseif gpt_medkit_sections[section] then
 		gpt_loot_counts.medkits = gpt_loot_counts.medkits + 1
-	elseif section == "bandage" then
-		gpt_loot_counts.bandages = gpt_loot_counts.bandages + 1
 	elseif section == "grenade_f1" or section == "grenade_rgd5" then
 		gpt_loot_counts.grenades = gpt_loot_counts.grenades + 1
 	end
