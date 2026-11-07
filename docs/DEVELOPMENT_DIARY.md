@@ -305,3 +305,13 @@
 2. Завершить статический аудит NPC/squad lifecycle, включая save/load, переходы уровней и ситуации после смерти.
 3. Пересмотреть потребности и их persistence backend; логический интерфейс уже отделён от текущего actor PSTOR backend.
 4. Только после закрытия главы NPC подготовить единый чек-лист и попросить пользователя об одном общем игровом тесте.
+
+
+## 2026-11-08 — Offline target для companion squad и защита пустого отряда
+
+- Проверен `sim_board:get_squad_target()`: при `squad.gpt_companion == true` функция возвращает `alife():actor()` до стандартного выбора цели по simulation registry. Следовательно, offline A-Life группа спутника должна продолжать ориентироваться на игрока, а не искать произвольный Smart Terrain. Это соответствует текущей роли штатного follower на первой главе; автономное независимое перемещение/цели относятся к последующим главам.
+- В `sim_squad_scripted:update()` добавлен ранний выход для GPT companion squad без `commander_id`. Смысл — не запускать generic A-Life action cycle на остаточном пустом group object, если временно не удалось зарегистрировать участника. В normal online/offline группе с зарегистрированным участником этот путь не должен менять поведение.
+- Это дополняет retry-safe setup в `bind_stalker.script`: регистрация участника, membership, relation и T/S/G теперь являются отдельными проверяемыми шагами; sound manager остаётся вспомогательным.
+- Коммит: `d8ae7fae3976453b6f6afeb0bcd50a214887224e` — Skip offline simulation for empty companion squad.
+- После изменения повторно выполнена структурная проверка блоков для четырёх изменённых Lua-файлов; все четыре прошли. Это не Lua compiler и не runtime check.
+
