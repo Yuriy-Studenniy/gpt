@@ -13,7 +13,7 @@ net_spawn
 
 -- GPT AI Companion: consume supplies only when the corresponding need is high.
 -- The engine applies the item's normal eat/boost effects; the companion's
--- abstract hunger/thirst values are adjusted separately and saved on the actor.
+-- abstract hunger/thirst values are adjusted through the companion-state interface.
 local function gpt_count_companion_inventory_section(npc, section)
 	local count = 0
 	npc:iterate_inventory(function(owner, item)
@@ -89,7 +89,7 @@ local function gpt_consume_companion_item(npc, section, need_name, relief)
 		gpt_companion_set_need(need_name, math.max(0, need - relief))
 	end
 
-	printf("[GPT_COMPANION] Consumed %s for %s", section, need_key)
+	printf("[GPT_COMPANION] Consumed %s for %s", section, need_name)
 	return true
 end
 
