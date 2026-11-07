@@ -60,6 +60,11 @@ local function ensure_gpt_companion_squad(companion_id, actor)
 		return nil
 	end
 
+	if companion:alive() ~= true then
+		printf("[GPT_COMPANION] Companion is dead; not recreating its squad")
+		return nil
+	end
+
 	if squad == nil then
 		squad = alife():create(
 			"gpt_companion_squad",
