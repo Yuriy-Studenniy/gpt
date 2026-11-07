@@ -158,6 +158,7 @@ local gpt_loot_ammo_needed = false
 
 local gpt_loot_equipment_best = nil
 local gpt_loot_equipment_taken = nil
+local gpt_loot_equipment_candidates = nil
 local gpt_loot_detector_rank = 0
 
 local gpt_detector_ranks = {
@@ -363,6 +364,7 @@ local function gpt_begin_loot_context(npc)
 		gpt_loot_ammo_taken = nil
 		gpt_loot_equipment_best = nil
 		gpt_loot_equipment_taken = nil
+		gpt_loot_equipment_candidates = nil
 		gpt_loot_detector_rank = 0
 		return
 	end
@@ -372,6 +374,7 @@ local function gpt_begin_loot_context(npc)
 	gpt_loot_ammo_taken = {}
 	gpt_loot_equipment_best = {}
 	gpt_loot_equipment_taken = {}
+	gpt_loot_equipment_candidates = nil
 	gpt_loot_detector_rank = 0
 	npc:iterate_inventory(gpt_count_loot_inventory, npc)
 
@@ -396,6 +399,7 @@ local function gpt_end_loot_context()
 	gpt_loot_ammo_taken = nil
 	gpt_loot_equipment_best = nil
 	gpt_loot_equipment_taken = nil
+	gpt_loot_equipment_candidates = nil
 	gpt_loot_detector_rank = 0
 end
 
@@ -646,9 +650,59 @@ end
 
 local transfer_to_npc = nil
 
+local function gpt_select_best_equipment(npc, item)
+	local section = item:section()
+	if lootable_table[section] ~= true then
+		return
+	end
+
+	local equipment_group, equipment_score = gpt_get_equipment_profile(item)
+	if equipment_group ~= nil and equipment_score ~= nil
+		and gpt_wants_loot_section(section, item) then
+		local selected = gpt_loot_equipment_candidates[equipment_group]
+		if selected == nil or equipment_score > selected.score then
+			gpt_loot_equipment_candidates[equipment_group] = {
+				id = item:id(),
+				score = equipment_score
+			}
+		end
+		return
+	end
+
+	local detector_rank = gpt_detector_rank(section)
+	if detector_rank > 0 and gpt_wants_loot_section(section, item) then
+		local selected = gpt_loot_equipment_candidates.detector
+		if selected == nil or detector_rank > selected.score then
+			gpt_loot_equipment_candidates.detector = {
+				id = item:id(),
+				score = detector_rank
+			}
+		end
+	end
+end
+
 function get_item(npc, item)
 	local section = item:section()
-	if lootable_table[section] == true and gpt_wants_loot_section(section, item) then
+	if lootable_table[section] ~= true then
+		return
+	end
+
+	local equipment_group = gpt_get_equipment_profile(item)
+	if gpt_loot_equipment_candidates ~= nil then
+		if equipment_group ~= nil then
+			local selected = gpt_loot_equipment_candidates[equipment_group]
+			if selected == nil or selected.id ~= item:id() then
+				return
+			end
+		elseif gpt_detector_rank(section) > 0 then
+			local selected = gpt_loot_equipment_candidates.detector
+			if selected == nil or selected.id ~= item:id() then
+				return
+			end
+		end
+	end
+
+	if gpt_wants_loot_section(section, item) then
 		npc:transfer_item(item, transfer_to_npc)
 		gpt_mark_loot_taken(section, item)
 	end
@@ -666,6 +720,8 @@ function get_all_from_corpse(npc)
 
 	transfer_to_npc = npc
 	gpt_begin_loot_context(npc)
+	gpt_loot_equipment_candidates = {}
+	corpse_npc:iterate_inventory(gpt_select_best_equipment, corpse_npc)
 	corpse_npc:iterate_inventory(get_item, corpse_npc)
 	gpt_end_loot_context()
 	transfer_to_npc = nil
