@@ -786,3 +786,249 @@ function gpt_world.get_companion_location_snapshot(companion_alife_id)
         source = "xray_alife_snapshot"
     }, nil
 end
+
+
+-- Companion knowledge is deliberately separate from the engine snapshot and
+-- static catalog. This first backend is session-only until save compatibility
+-- for the companion A-Life squad has been audited.
+local GPT_WORLD_CLAIMS = {}
+local GPT_WORLD_NEXT_CLAIM_ID = 1
+local GPT_WORLD_MAX_CLAIMS = 512
+
+local GPT_WORLD_CLAIM_STATUSES = {
+    observed = true,
+    reported = true,
+    inferred = true
+}
+
+local function gpt_world_is_nonempty_string(value)
+    return type(value) == "string" and value ~= ""
+        and string.find(value, ":", 1, true) ~= nil
+end
+
+local function gpt_world_is_claim_scalar(value)
+    local value_type = type(value)
+    return value_type == "string" or value_type == "number" or value_type == "boolean"
+end
+
+local function gpt_world_copy_claim(claim)
+    if type(claim) ~= "table" then
+        return nil
+    end
+
+    local copy = {}
+    for key, value in pairs(claim) do
+        if type(value) ~= "table" then
+            copy[key] = value
+        end
+    end
+    return copy
+end
+
+-- Stores one explicit knowledge claim in the current Lua session.
+-- Required fields: subject_id, predicate, value, status, source_type,
+-- confidence (0..1), created_at (caller-supplied game-time value).
+-- Returns: stored_claim, nil or nil, stable_error_code.
+function gpt_world.record_claim(claim)
+    if type(claim) ~= "table" then
+        return nil, "claim_not_table"
+    end
+    if not gpt_world_is_nonempty_string(claim.subject_id) then
+        return nil, "invalid_subject_id"
+    end
+    if type(claim.predicate) ~= "string" or claim.predicate == "" then
+        return nil, "invalid_predicate"
+    end
+    if claim.value == nil or not gpt_world_is_claim_scalar(claim.value) then
+        return nil, "invalid_claim_value"
+    end
+    if not GPT_WORLD_CLAIM_STATUSES[claim.status] then
+        return nil, "invalid_claim_status"
+    end
+    if type(claim.source_type) ~= "string" or claim.source_type == "" then
+        return nil, "invalid_source_type"
+    end
+    if type(claim.source_id) ~= "nil"
+        and type(claim.source_id) ~= "string"
+        and type(claim.source_id) ~= "number" then
+        return nil, "invalid_source_id"
+    end
+    if type(claim.confidence) ~= "number"
+        or claim.confidence < 0 or claim.confidence > 1 then
+        return nil, "invalid_confidence"
+    end
+    if type(claim.created_at) ~= "number" or claim.created_at < 0 then
+        return nil, "invalid_created_at"
+    end
+    if claim.last_confirmed_at ~= nil
+        and (type(claim.last_confirmed_at) ~= "number" or claim.last_confirmed_at < 0) then
+        return nil, "invalid_last_confirmed_at"
+    end
+    if #GPT_WORLD_CLAIMS >= GPT_WORLD_MAX_CLAIMS then
+        return nil, "claim_store_full"
+    end
+
+    local stored = {
+        claim_id = "claim:" .. tostring(GPT_WORLD_NEXT_CLAIM_ID),
+        subject_id = claim.subject_id,
+        predicate = claim.predicate,
+        value = claim.value,
+        status = claim.status,
+        source_type = claim.source_type,
+        source_id = claim.source_id,
+        confidence = claim.confidence,
+        created_at = claim.created_at,
+        last_confirmed_at = claim.last_confirmed_at
+    }
+
+    GPT_WORLD_NEXT_CLAIM_ID = GPT_WORLD_NEXT_CLAIM_ID + 1
+    GPT_WORLD_CLAIMS[#GPT_WORLD_CLAIMS + 1] = stored
+    return gpt_world_copy_claim(stored), nil
+end
+
+-- Returns copies only; callers cannot mutate the internal claim store.
+-- Both filters are optional.
+function gpt_world.get_claims(subject_id, predicate)
+    if subject_id ~= nil and not gpt_world_is_nonempty_string(subject_id) then
+        return {}
+    end
+    if predicate ~= nil and (type(predicate) ~= "string" or predicate == "") then
+        return {}
+    end
+
+    local result = {}
+    for _, claim in ipairs(GPT_WORLD_CLAIMS) do
+        if (subject_id == nil or claim.subject_id == subject_id)
+            and (predicate == nil or claim.predicate == predicate) then
+            result[#result + 1] = gpt_world_copy_claim(claim)
+        end
+    end
+    return result
+end
+
+-- A place is returned only after an explicit positive known_place claim.
+-- Catalog membership alone never creates a known place.
+-- Optional filters.level_id limits results to a catalogued level.
+function gpt_world.get_known_places(filters)
+    if filters ~= nil and type(filters) ~= "table" then
+        return {}
+    end
+
+    local level_filter = filters and filters.level_id or nil
+    if level_filter ~= nil and not gpt_world_is_nonempty_string(level_filter) then
+        return {}
+    end
+
+    local places_by_id = {}
+    for _, claim in ipairs(GPT_WORLD_CLAIMS) do
+        if claim.predicate == "known_place" then
+            local place_id = claim.subject_id
+            local include_place = true
+
+            if level_filter ~= nil then
+                if place_id == level_filter then
+                    include_place = true
+                else
+                    local catalog_record = gpt_world.get_catalog_entity(place_id)
+                    include_place = catalog_record ~= nil
+                        and catalog_record.level_id == level_filter
+                end
+            end
+
+            if include_place then
+                local entry = places_by_id[place_id]
+                if entry == nil then
+                    entry = {
+                        entity_id = place_id,
+                        claims = {},
+                        known = false
+                    }
+                    places_by_id[place_id] = entry
+                end
+
+                entry.claims[#entry.claims + 1] = gpt_world_copy_claim(claim)
+                if claim.value == true then
+                    entry.known = true
+                end
+            end
+        end
+    end
+
+    local result = {}
+    for _, entry in pairs(places_by_id) do
+        if entry.known then
+            result[#result + 1] = entry
+        end
+    end
+
+    table.sort(result, function(left, right)
+        return left.entity_id < right.entity_id
+    end)
+    return result
+end
+
+-- Converts only an explicitly confirmed place-observation event into knowledge.
+-- Required event fields: event_type="place_observed", confirmed=true,
+-- entity_id, source_id and created_at. No world scanning is performed here.
+function gpt_world.record_observation(event)
+    if type(event) ~= "table" then
+        return nil, "event_not_table"
+    end
+    if event.event_type ~= "place_observed" then
+        return nil, "unsupported_observation_event"
+    end
+    if event.confirmed ~= true then
+        return nil, "observation_not_confirmed"
+    end
+    if not gpt_world_is_nonempty_string(event.entity_id) then
+        return nil, "invalid_observed_entity_id"
+    end
+    if type(event.source_id) ~= "string" and type(event.source_id) ~= "number" then
+        return nil, "invalid_observation_source_id"
+    end
+    if type(event.created_at) ~= "number" or event.created_at < 0 then
+        return nil, "invalid_observation_time"
+    end
+
+    local confidence = event.confidence
+    if confidence == nil then
+        confidence = 1
+    end
+
+    return gpt_world.record_claim({
+        subject_id = event.entity_id,
+        predicate = "known_place",
+        value = true,
+        status = "observed",
+        source_type = "observation",
+        source_id = event.source_id,
+        confidence = confidence,
+        created_at = event.created_at,
+        last_confirmed_at = event.created_at
+    })
+end
+
+-- Gives future dialogue/agent code a single envelope while keeping objective
+-- engine state and character knowledge in separate named fields.
+-- Knowledge includes only explicit claims; it is not inferred from the catalog.
+function gpt_world.get_companion_world_context(companion_alife_id)
+    local snapshot, snapshot_error =
+        gpt_world.get_companion_location_snapshot(companion_alife_id)
+    if snapshot == nil then
+        return nil, snapshot_error
+    end
+
+    local level_id = snapshot.level and snapshot.level.entity_id or nil
+    local known_places = gpt_world.get_known_places({
+        level_id = level_id
+    })
+
+    return {
+        engine = snapshot,
+        knowledge = {
+            known_places = known_places,
+            persistence = "session_only"
+        },
+        source = "gpt_world_context"
+    }, nil
+end
