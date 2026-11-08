@@ -769,3 +769,10 @@
 - Retail diagnostics оставлены на подтверждённом канале `get_console():execute()`; `printf` не используется как критерий прохождения тестов.
 - Статические block-balance проверки обоих Lua-файлов прошли. Lua compiler и целевой CoP runtime в этой среде недоступны; обе новые runtime-проверки пока ожидают подтверждения пользовательским логом.
 - Изменения кода опубликованы в `main`: `gpt_world.script` commit `2d99de894a7ee5af6a265037df5172d7bfc62518`; `bind_stalker.script` обновлён последовательными коммитами разделения и диагностики.
+
+## 2026-11-09 — Отключение автоматических World Model self-test после регрессии spawn
+
+- Пользовательский лог с новой схемой показал только `knowledge_api_core_dispatch`; после этого NPC перестал появляться. Core self-test был запущен из `gpt_world_log_module_status()`, который вызывается в `actor_binder:update` непосредственно перед `gpt_update_companion_setup()`. Это поставило диагностический код перед критическим путём создания компаньона.
+- Удалён автоматический core knowledge self-test из module-load/update path, а также автоматический engine-context probe после online snapshot. Из update-цикла убрана вся автоматическая self-test работа; оставлены ранее проверенные lazy-load диагностика, read-only snapshot и штатный companion setup.
+- `gpt_world.run_knowledge_api_self_test()` оставлена как API-функция в `gpt_world.script`, но больше не вызывается автоматически. Её безопасный запуск нужно спроектировать отдельно — вне критического actor update/spawn пути.
+- Текущий `bind_stalker.script` опубликован в commit `169dabc11f60512f8ec1cafb5e7a727f104b8d2e`. Структурная проверка блоков и скобок прошла. Runtime-восстановление spawn ещё не подтверждено.
