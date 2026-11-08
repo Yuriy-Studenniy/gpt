@@ -1088,7 +1088,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         end
         if claim.claim_id ~= "claim:1"
             or claim.subject_id ~= "poi:gpt_world_self_test:claim"
-            or claim.level_id ~= "level:zaton"
+            or claim.level_id ~= test_level_id
             or claim.confidence ~= 1 then
             error("claim_write_result_invalid")
         end
@@ -1115,14 +1115,14 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         end
         result.claim_read_ok = true
 
-        local zaton_places = gpt_world.get_known_places({
+        local current_level_places = gpt_world.get_known_places({
             level_id = test_level_id
         })
         local jupiter_places = gpt_world.get_known_places({
             level_id = "level:gpt_world_self_test_other"
         })
-        if type(zaton_places) ~= "table" or #zaton_places ~= 1
-            or zaton_places[1].entity_id ~= "poi:gpt_world_self_test:claim"
+        if type(current_level_places) ~= "table" or #current_level_places ~= 1
+            or current_level_places[1].entity_id ~= "poi:gpt_world_self_test:claim"
             or type(jupiter_places) ~= "table" or #jupiter_places ~= 0 then
             error("known_places_level_filter_mismatch")
         end
@@ -1166,6 +1166,9 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
             or type(context.engine.level) ~= "table"
             or type(context.engine.level.entity_id) ~= "string" then
             error("world_context_unavailable:" .. tostring(context_error))
+        end
+        if context.engine.is_online ~= true then
+            error("world_context_companion_not_online")
         end
         if type(context.knowledge) ~= "table"
             or context.knowledge.persistence ~= "session_only"
