@@ -455,14 +455,23 @@ local function gpt_companion_log_world_snapshot(companion_id)
 		gpt_world_snapshot_marker("smart_none")
 	end
 
-	if type(snapshot.smart_terrain_status) == "string" then
-		gpt_world_snapshot_marker("smart_status", snapshot.smart_terrain_status)
-	end
-	if type(snapshot.smart_terrain_alife_object_id) == "number" then
-		gpt_world_snapshot_marker("smart_id", tostring(snapshot.smart_terrain_alife_object_id))
+	-- Mark the core location snapshot complete before inspecting optional
+	-- Smart Terrain metadata. The companion may legitimately have no Smart Terrain.
+	gpt_world_snapshot_marker("read_ok")
+
+	-- Optional metadata must never prevent the knowledge API probe from running.
+	local smart_meta_ok, smart_meta_error = pcall(function()
+		if type(snapshot.smart_terrain_status) == "string" then
+			gpt_world_snapshot_marker("smart_status", snapshot.smart_terrain_status)
+		end
+		if type(snapshot.smart_terrain_alife_object_id) == "number" then
+			gpt_world_snapshot_marker("smart_id", tostring(snapshot.smart_terrain_alife_object_id))
+		end
+	end)
+	if not smart_meta_ok then
+		gpt_world_snapshot_marker("smart_metadata_failed", string.sub(tostring(smart_meta_error), 1, 48))
 	end
 
-	gpt_world_snapshot_marker("read_ok")
 	return snapshot, nil
 end
 
@@ -471,10 +480,12 @@ end
 -- Exercise the public knowledge/context API once after the companion is online.
 -- The World Model helper isolates and restores its temporary claims.
 local function gpt_companion_log_knowledge_api(companion_id)
+	gpt_world_snapshot_marker("knowledge_api_probe_entered")
 	local call_ok, results, error_code = pcall(function()
 		return gpt_world.run_knowledge_api_self_test(companion_id)
 	end)
 
+	gpt_world_snapshot_marker("knowledge_api_probe_returned")
 	if not call_ok then
 		gpt_world_snapshot_marker("knowledge_api_call_failed", string.sub(tostring(results), 1, 64))
 		return
