@@ -466,8 +466,8 @@ local function gpt_companion_log_world_snapshot(companion_id)
 	return snapshot, nil
 end
 
--- Retry briefly so the first sample is not limited to the frame in which the
--- companion's A-Life object was created or recovered from the save.
+-- Retry briefly until the companion is confirmed online. Smart Terrain is
+-- optional for this player-following companion and must not block snapshot completion.
 local function gpt_update_world_snapshot(binder, now)
 	local companion_id = binder.gpt_world_snapshot_companion_id
 	if companion_id == nil or binder.gpt_world_snapshot_done then
@@ -482,7 +482,7 @@ local function gpt_update_world_snapshot(binder, now)
 	gpt_world_snapshot_marker("attempt", tostring(attempt))
 
 	local snapshot = gpt_companion_log_world_snapshot(companion_id)
-	if snapshot ~= nil and snapshot.is_online == true and snapshot.smart_terrain ~= nil then
+	if snapshot ~= nil and snapshot.is_online == true then
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
