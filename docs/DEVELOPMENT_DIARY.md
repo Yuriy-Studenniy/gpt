@@ -749,7 +749,7 @@
 - `record_observation` принимает только событие `place_observed` с `confirmed=true`, идентификатором источника и временем. Это API ещё не подключено к игровому visibility/event hook: никакие места не открываются автоматически и не сканируется весь уровень.
 - `get_known_places` возвращает только сущности, у которых есть положительный `known_place` claim; статический каталог не превращается в знания персонажа. `get_companion_world_context` не смешивает текущий уровень Затон с remembered/known places.
 - Backend намеренно session-only, ограничен 512 claims и не сериализуется. Save compatibility старых A-Life squad save-пакетов не затрагивалась; persistence остаётся отдельной задачей до аудита формата STATE_Read/STATE_Write.
-- Статическая структура Lua будет проверена; игровой runtime новой API ещё не подтверждён.
+- Статическая лексическая проверка строк/комментариев, блоков и скобок для `gpt_world.script` и `bind_stalker.script` прошла; это не Lua-компиляция. Игровой runtime self-test новой API ещё не подтверждён.
 
 
 ## 2026-11-08 — Изолированная runtime self-test для World Model API
