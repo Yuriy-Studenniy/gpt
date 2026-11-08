@@ -722,3 +722,12 @@
 - Snapshot выдаёт отдельные retail-visible console markers: `world_snapshot_probe_entered`, `world_snapshot_level_<name>`, `world_snapshot_online_<bool>`, `world_snapshot_smart_<name>` или `world_snapshot_smart_none`, затем `world_snapshot_read_ok`; ошибки выводятся как `world_snapshot_unavailable_<code>` или `world_snapshot_call_failed_<text>`. Ожидаемое отображение в логе начинается с `Unknown command:`; сами маркеры не меняют игровые данные.
 - Статическая проверка обновлённых Lua файлов: баланс блоков function/if/for/while/do/repeat/end/until и скобок не является компиляцией; синтаксис и реальные поля ещё должны подтвердиться в оригинальном CoP runtime. Результат snapshot в игре пока не проверен.
 - Коммиты: `gpt_world.script` `142450e0b8f14f9f032f0f26a6cfd1154552c0d1`; `bind_stalker.script` snapshot `3e64cd9452342f5ae38e8e8b828fdba99909760b`, затем сохранение ID при squad exception `89333771d21bf9d79829514e37e492d204d39a22`.
+
+
+## 2026-11-08 — Повторный замер A-Life snapshot
+
+- Пользовательский runtime-лог подтвердил первый успешный snapshot на Затоне: `level_zaton`, `online_false`, `smart_none`, `read_ok`. Это не ошибка чтения: уровень получен из A-Life server object, а online object в `db.storage[id].object` в момент первого замера отсутствовал.
+- Одноразовый замер запускался слишком близко к созданию/восстановлению NPC и не показывал, меняется ли online state после обновления A-Life. Добавлено до пяти повторов с интервалом 2 секунды; polling продолжается независимо от того, что настройка companion squad уже завершилась.
+- `gpt_world_resolve_smart_terrain()` теперь возвращает статус причины: `resolved`, `no_smart_terrain_assigned`, `smart_terrain_id_unavailable`, `smart_terrain_object_unavailable` или `smart_terrain_name_unavailable`. Эти статусы не заменяют сам факт location snapshot и не превращают отсутствие Smart Terrain в ошибку.
+- Runtime-проверка новой версии ещё не выполнена. Статическая проверка и проверка структуры Lua-кода не заменяют запуск в оригинальном CoP 1.6.02.
+- Коммиты: `gpt_world.script` `06a9c0d8bb64589cfb4533db163d0653f19f6d70`; `bind_stalker.script` `62a09c2129933f8d4a66f156da22f14578090150`.
