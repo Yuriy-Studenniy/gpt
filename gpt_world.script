@@ -47,6 +47,437 @@ local GPT_WORLD_LEVEL_CATALOG = {
     }
 }
 
+-- Named A-Life destinations compiled from the stock start_position_*
+-- assignments in simulation.ltx, plus explicit Smart Terrain property
+-- sections in simulation_objects_props.ltx. Test maps and commented rows
+-- are intentionally excluded. Presence here does not imply companion knowledge.
+local GPT_WORLD_SMART_TERRAIN_CATALOG = {
+    ["smart:jupiter:jup_a10_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_a10_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_a10_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter", "simulation_objects_props.ltx" }
+    },
+    ["smart:jupiter:jup_a12"] = {
+        entity_id = "smart:jupiter:jup_a12",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_a12",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_a6"] = {
+        entity_id = "smart:jupiter:jup_a6",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_a6",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b19"] = {
+        entity_id = "smart:jupiter:jup_b19",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b19",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b200_tushkan_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_b200_tushkan_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b200_tushkan_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter", "simulation_objects_props.ltx" }
+    },
+    ["smart:jupiter:jup_b203"] = {
+        entity_id = "smart:jupiter:jup_b203",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b203",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b203_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_b203_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b203_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter_b203" }
+    },
+    ["smart:jupiter:jup_b204"] = {
+        entity_id = "smart:jupiter:jup_b204",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b204",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b205_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_b205_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b205_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter", "simulation_objects_props.ltx" }
+    },
+    ["smart:jupiter:jup_b205_smart_terrain_tushkano"] = {
+        entity_id = "smart:jupiter:jup_b205_smart_terrain_tushkano",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b205_smart_terrain_tushkano",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter", "simulation_objects_props.ltx" }
+    },
+    ["smart:jupiter:jup_b208"] = {
+        entity_id = "smart:jupiter:jup_b208",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b208",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b211"] = {
+        entity_id = "smart:jupiter:jup_b211",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b211",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b25_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_b25_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b25_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter_B9", "simulation.ltx:start_position_jupiter_b4" }
+    },
+    ["smart:jupiter:jup_b4"] = {
+        entity_id = "smart:jupiter:jup_b4",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b4",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b4_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_b4_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b4_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter_b4" }
+    },
+    ["smart:jupiter:jup_b41"] = {
+        entity_id = "smart:jupiter:jup_b41",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b41",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b47"] = {
+        entity_id = "smart:jupiter:jup_b47",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b47",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter" }
+    },
+    ["smart:jupiter:jup_b8_smart_terrain"] = {
+        entity_id = "smart:jupiter:jup_b8_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:jupiter",
+        engine_name = "jup_b8_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_jupiter", "simulation_objects_props.ltx" }
+    },
+    ["smart:labx8:lx8_smart_terrain"] = {
+        entity_id = "smart:labx8:lx8_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:labx8",
+        engine_name = "lx8_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_labx8", "simulation_objects_props.ltx" }
+    },
+    ["smart:pripyat:pri_a16"] = {
+        entity_id = "smart:pripyat:pri_a16",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_a16",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_pripyat", "simulation.ltx:start_position_pripyat_a17" }
+    },
+    ["smart:pripyat:pri_a18_smart_terrain"] = {
+        entity_id = "smart:pripyat:pri_a18_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_a18_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_pripyat", "simulation_objects_props.ltx" }
+    },
+    ["smart:pripyat:pri_a21_smart_terrain"] = {
+        entity_id = "smart:pripyat:pri_a21_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_a21_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:pripyat:pri_a22_smart_terrain"] = {
+        entity_id = "smart:pripyat:pri_a22_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_a22_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:pripyat:pri_a25_smart_terrain"] = {
+        entity_id = "smart:pripyat:pri_a25_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_a25_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:pripyat:pri_b303"] = {
+        entity_id = "smart:pripyat:pri_b303",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_b303",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_pripyat" }
+    },
+    ["smart:pripyat:pri_b304_monsters_smart_terrain"] = {
+        entity_id = "smart:pripyat:pri_b304_monsters_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_b304_monsters_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_pripyat", "simulation_objects_props.ltx" }
+    },
+    ["smart:pripyat:pri_b306"] = {
+        entity_id = "smart:pripyat:pri_b306",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_b306",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_pripyat" }
+    },
+    ["smart:pripyat:pri_b36_smart_terrain"] = {
+        entity_id = "smart:pripyat:pri_b36_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:pripyat",
+        engine_name = "pri_b36_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_pripyat", "simulation.ltx:start_position_pripyat_b36", "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_a23_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_a23_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_a23_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b100"] = {
+        entity_id = "smart:zaton:zat_b100",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b100",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_b103_merc_smart"] = {
+        entity_id = "smart:zaton:zat_b103_merc_smart",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b103_merc_smart",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation.ltx:start_position_zaton_b52", "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b104_zombied"] = {
+        entity_id = "smart:zaton:zat_b104_zombied",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b104_zombied",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_b106_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_b106_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b106_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b14_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_b14_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b14_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b18"] = {
+        entity_id = "smart:zaton:zat_b18",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b18",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation.ltx:start_position_zaton_b18" }
+    },
+    ["smart:zaton:zat_b20_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_b20_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b20_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b28"] = {
+        entity_id = "smart:zaton:zat_b28",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b28",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation.ltx:start_position_zaton_b28" }
+    },
+    ["smart:zaton:zat_b33"] = {
+        entity_id = "smart:zaton:zat_b33",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b33",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation.ltx:start_position_zaton_b52" }
+    },
+    ["smart:zaton:zat_b38"] = {
+        entity_id = "smart:zaton:zat_b38",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b38",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_b39"] = {
+        entity_id = "smart:zaton:zat_b39",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b39",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_b40_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_b40_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b40_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b42_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_b42_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b42_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b5_smart_terrain"] = {
+        entity_id = "smart:zaton:zat_b5_smart_terrain",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b5_smart_terrain",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_b53"] = {
+        entity_id = "smart:zaton:zat_b53",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b53",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_b7"] = {
+        entity_id = "smart:zaton:zat_b7",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_b7",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_medic_home_smart"] = {
+        entity_id = "smart:zaton:zat_medic_home_smart",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_medic_home_smart",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton_b52", "simulation_objects_props.ltx" }
+    },
+    ["smart:zaton:zat_sim_11"] = {
+        entity_id = "smart:zaton:zat_sim_11",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_sim_11",
+        catalog_role = "simulation_node",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_sim_12"] = {
+        entity_id = "smart:zaton:zat_sim_12",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_sim_12",
+        catalog_role = "simulation_node",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_sim_13"] = {
+        entity_id = "smart:zaton:zat_sim_13",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_sim_13",
+        catalog_role = "simulation_node",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_sim_14"] = {
+        entity_id = "smart:zaton:zat_sim_14",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_sim_14",
+        catalog_role = "simulation_node",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_sim_15"] = {
+        entity_id = "smart:zaton:zat_sim_15",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_sim_15",
+        catalog_role = "simulation_node",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_sim_17"] = {
+        entity_id = "smart:zaton:zat_sim_17",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_sim_17",
+        catalog_role = "simulation_node",
+        source_records = { "simulation.ltx:start_position_zaton" }
+    },
+    ["smart:zaton:zat_stalker_base_smart"] = {
+        entity_id = "smart:zaton:zat_stalker_base_smart",
+        entity_type = "smart_terrain",
+        level_id = "level:zaton",
+        engine_name = "zat_stalker_base_smart",
+        catalog_role = "smart_terrain",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation.ltx:start_position_zaton_b106", "simulation.ltx:start_position_zaton_b52", "simulation_objects_props.ltx" }
+    }
+}
+
 local function gpt_world_copy_record(record)
     if type(record) ~= "table" then
         return nil
@@ -54,7 +485,15 @@ local function gpt_world_copy_record(record)
 
     local copy = {}
     for key, value in pairs(record) do
-        copy[key] = value
+        if type(value) == "table" then
+            local nested = {}
+            for nested_key, nested_value in pairs(value) do
+                nested[nested_key] = nested_value
+            end
+            copy[key] = nested
+        else
+            copy[key] = value
+        end
     end
     return copy
 end
@@ -66,7 +505,30 @@ function gpt_world.get_catalog_entity(entity_id)
         return nil
     end
 
-    return gpt_world_copy_record(GPT_WORLD_LEVEL_CATALOG[entity_id])
+    local record = GPT_WORLD_LEVEL_CATALOG[entity_id]
+        or GPT_WORLD_SMART_TERRAIN_CATALOG[entity_id]
+    return gpt_world_copy_record(record)
+end
+
+-- Returns a fresh array of static Smart Terrain descriptors. Passing nil
+-- returns all catalogued entries; a level entity ID filters the result.
+function gpt_world.get_catalog_smart_terrains(level_entity_id)
+    if level_entity_id ~= nil and type(level_entity_id) ~= "string" then
+        return {}
+    end
+
+    local result = {}
+    for _, record in pairs(GPT_WORLD_SMART_TERRAIN_CATALOG) do
+        if level_entity_id == nil or record.level_id == level_entity_id then
+            result[#result + 1] = gpt_world_copy_record(record)
+        end
+    end
+
+    table.sort(result, function(left, right)
+        return left.entity_id < right.entity_id
+    end)
+
+    return result
 end
 
 -- Returns a fresh array of static level descriptors.
