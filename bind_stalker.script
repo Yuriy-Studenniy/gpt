@@ -728,6 +728,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_companion_setup_blocked = false
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
+	self.gpt_world_module_checked = false
 	self.gpt_world_snapshot_companion_id = nil
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
@@ -764,6 +765,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_companion_setup_blocked = false
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
+	self.gpt_world_module_checked = false
 	self.gpt_world_snapshot_companion_id = nil
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
