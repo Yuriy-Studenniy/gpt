@@ -548,3 +548,14 @@
 - Удалён этот неподходящий вызов. Теперь используется результат `level.vertex_in_direction`, и проверяется только, что движок вернул вершину, отличную от текущей. Согласно API IXR_level, при отсутствии валидной вершины функция возвращает исходную.
 - Commit: `3f41bb6127c3a8602ab574cb1b05abcf1a22ebfe`.
 - Статическая проверка обновлённого блока выполнена. CoP runtime не запускался; следующий шаг — заменить только `bind_stalker.script` и проверить, появились ли маркеры safe spawn / created companion / setup complete.
+
+
+### Исправление fatal error: API потребностей загружался слишком поздно — 2026-11-08
+
+- Пользователь запустил игру с диагностической версией и прислал `FATAL ERROR`: `xr_motivator.script:121: attempt to call global 'gpt_companion_get_need' (a nil value)`. Это конкретно объяснило остановку при загрузке сохранения.
+- Исправление к предыдущему объяснению: API не отсутствовал во всём проекте. `gpt_companion_get_need`, `gpt_companion_set_need`, `gpt_companion_update_needs` и `gpt_companion_get_needs` существовали в начале `sim_squad_scripted.script`, но находились в модуле A-Life squad. `motivator_binder:update()` может обратиться к ним до того, как этот модуль класса будет загружен; глобальные функции оказывались `nil`.
+- Перенёс весь API и внутренние константы в `bind_stalker.script` — actor bootstrap, загружаемый вместе с актёром до игровых обновлений NPC. Удалил дублирующую реализацию из `sim_squad_scripted.script`; оставил там только явный комментарий о зависимости от actor bootstrap.
+- Проверил все известные потребители: `xr_motivator.script` читает/меняет hunger/thirst; `xr_corpse_detection.script` получает профиль нужд; `sim_squad_scripted.script` вызывает общий updater при offline/online simulation. Backend PSTOR актёра и сериализация `actor_binder:save/load` не изменялись.
+- Дополнительно исправлен остаточный неверный вызов `get_story_objects_registry()` в `xr_corpse_detection.script`: теперь используется ванильная обёртка `get_object_story_id(npc:id())`.
+- Коммиты: `002aa908871e641b13d523b03f9f5c3c4e98557b`, `81d5bd147ba7bea1bb71c8cab5cba4141c101ff4`, `72c56e646e241187b96dbbf93163a0d4d9dccdb8`, `360e9a9dd7b107fd37f0f91d1cb04542a9eddc23`, `30c4ca0e5ed851145503bd0b677aab9da00fef2b`.
+- Статическая проверка выполнена по текущим версиям трёх игровых файлов. Lua-компилятор и игру CoP не запускал; подтверждение остаётся только на стороне игрового теста.
