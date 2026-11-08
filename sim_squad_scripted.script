@@ -170,7 +170,11 @@ function sim_squad_scripted:update()
 	-- The squad keeps ticking needs even while its only member is offline.
 	-- The helper itself throttles writes by in-game elapsed time.
 	if self.gpt_companion == true then
-		gpt_companion_update_needs(self)
+		if type(gpt_companion_update_needs) == "function" then
+			gpt_companion_update_needs(self)
+		else
+			printf("[GPT_COMPANION] Need updater is unavailable; skipping needs update")
+		end
 		-- A failed member registration can leave an empty squad object behind.
 		-- Do not run generic A-Life target selection for a companion with no member.
 		if self:commander_id() == nil then
