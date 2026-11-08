@@ -8,8 +8,8 @@ take_items = true
 can_select_weapon = true
 
 [companion@gpt_follow]
-; A companion should not use the default NPC meeting bark when the actor has a weapon drawn.
-meet = no_meet
+; Keep the companion usable while suppressing the default weapon-down bark.
+meet = gpt_companion_meet
 wounded = gpt_companion_wounded
 gather_items_enabled = true
 corpse_detection_enabled = true
@@ -18,3 +18,13 @@ corpse_detection_enabled = true
 use_medkit = true
 autoheal = true
 enable_talk = true
+
+
+[gpt_companion_meet]
+meet_state = 30|wait@nil
+meet_state_wpn = 30|wait@nil
+victim = 30|actor
+victim_wpn = 30|actor
+use = true
+use_wpn = true
+abuse = false
