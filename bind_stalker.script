@@ -267,8 +267,8 @@ local function gpt_update_companion_setup(binder)
 		retry_delay = 60000
 	end
 	binder.gpt_companion_setup_retry_at = now + retry_delay
-	log("[GPT_COMPANION] Setup attempt " .. tostring(binder.gpt_companion_setup_attempts)
-		.. " failed (" .. tostring(setup_status) .. "); retry in " .. tostring(retry_delay) .. " ms")
+	gpt_companion_diagnostic("Setup attempt " .. tostring(binder.gpt_companion_setup_attempts)
+		.. " failed " .. tostring(setup_status) .. " retry in " .. tostring(retry_delay) .. " ms")
 	printf("[GPT_COMPANION] Setup attempt %s failed (%s); retry in %s ms",
 		tostring(binder.gpt_companion_setup_attempts), tostring(setup_status), tostring(retry_delay))
 end
