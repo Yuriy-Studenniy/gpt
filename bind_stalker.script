@@ -41,7 +41,7 @@ local function gpt_companion_spawn_point(actor)
 				forward.x * sine + forward.z * cosine
 			)
 			local candidate = level.vertex_in_direction(actor_vertex_id, direction, distance)
-			if candidate ~= nil and candidate ~= actor_vertex_id and actor:accessible(candidate) == true then
+			if candidate ~= nil and candidate ~= actor_vertex_id then
 				return level.vertex_position(candidate), candidate
 			end
 		end
