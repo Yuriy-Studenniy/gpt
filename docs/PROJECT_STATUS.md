@@ -225,3 +225,13 @@
 - В `bind_stalker.script` оба lookup (NPC и squad) переведены на `get_story_object_id`, а обе очистки stale Story ID — на `unregister_story_id`. Других прямых вызовов `get_story_objects_registry()` в `bind_stalker.script` не осталось.
 - Commit: `eca2cd6d37d0414b0662e30387d268d6ed7182e4`.
 - Статически подтверждено наличие wrapper-функций в `_g.script` и engine API `level.vertex_in_direction` / `actor:accessible` в `lua_help.script`. Сам успешный spawn и регистрацию squad нужно подтвердить в игре.
+
+
+### Диагностика отсутствующего NPC по логу пользователя — 2026-11-08
+
+- В xray_administrator.log нет fatal error и нет строк [GPT_COMPANION]. printf-сообщения скриптов в этом логе не видны, поэтому отсутствие таких строк не доказывает, что updater не вызывался.
+- Лог показывает загрузку сохранения testi.scop (а не событие старта New Game) и завершение сессии через Disconnect; рядом присутствует команда dump_infos, которую движок не знает. Это сообщение не является причиной отсутствия companion.
+- В bind_stalker.script добавлены диагностические вызовы движковой log(string) (наличие сигнатуры подтверждено в lua_help.script): вход в actor updater, вход в spawn routine, Story ID lookup, выбор spawn vertex, создание NPC, setup success/exception/failure.
+- Commit: e948278978f978317b443aa1c8e99e65cd722b56.
+- Следующий лог должен позволить различить: script не обновлён/не исполняется; Story ID lookup; отсутствие доступной spawn vertex; отказ alife():create; ошибка squad setup.
+
