@@ -1,0 +1,206 @@
+--[[
+    GPT World Model - read-only X-Ray adapter
+    Target: S.T.A.L.K.E.R.: Call of Pripyat 1.6.02 / original X-Ray
+
+    This module reads the current A-Life location of the unique companion.
+    It does not discover places, persist knowledge, or change NPC behavior.
+]]
+
+gpt_world = gpt_world or {}
+
+local GPT_WORLD_COMPANION_STORY_ID = "gpt_companion_main"
+local GPT_WORLD_NO_SMART_TERRAIN_ID = 65535
+
+local function gpt_world_safe_index(object, field_name)
+    if object == nil then
+        return nil
+    end
+
+    local ok, value = pcall(function()
+        return object[field_name]
+    end)
+
+    if ok then
+        return value
+    end
+
+    return nil
+end
+
+local function gpt_world_safe_method(object, method_name, ...)
+    local method = gpt_world_safe_index(object, method_name)
+    if type(method) ~= "function" then
+        return nil
+    end
+
+    local ok, value = pcall(method, object, ...)
+    if ok then
+        return value
+    end
+
+    return nil
+end
+
+local function gpt_world_get_alife()
+    if type(alife) ~= "function" then
+        return nil
+    end
+
+    local ok, simulation = pcall(alife)
+    if ok then
+        return simulation
+    end
+
+    return nil
+end
+
+local function gpt_world_get_game_graph()
+    if type(game_graph) ~= "function" then
+        return nil
+    end
+
+    local ok, graph = pcall(game_graph)
+    if ok then
+        return graph
+    end
+
+    return nil
+end
+
+local function gpt_world_get_companion_server_object(simulation)
+    if type(get_story_object_id) ~= "function" then
+        return nil, "story_id_lookup_unavailable"
+    end
+
+    local ok, companion_id = pcall(get_story_object_id, GPT_WORLD_COMPANION_STORY_ID)
+    if not ok then
+        return nil, "story_id_lookup_failed"
+    end
+    if type(companion_id) ~= "number" then
+        return nil, "companion_not_registered"
+    end
+
+    local companion = gpt_world_safe_method(simulation, "object", companion_id)
+    if companion == nil then
+        return nil, "companion_object_unavailable"
+    end
+
+    return companion, companion_id
+end
+
+local function gpt_world_get_game_vertex_id(companion)
+    local game_vertex_id = gpt_world_safe_index(companion, "m_game_vertex_id")
+    if type(game_vertex_id) == "number" then
+        return game_vertex_id
+    end
+
+    game_vertex_id = gpt_world_safe_method(companion, "game_vertex_id")
+    if type(game_vertex_id) == "number" then
+        return game_vertex_id
+    end
+
+    return nil
+end
+
+local function gpt_world_resolve_level(simulation, graph, game_vertex_id)
+    if type(game_vertex_id) ~= "number" then
+        return nil
+    end
+
+    local vertex = gpt_world_safe_method(graph, "vertex", game_vertex_id)
+    if vertex == nil then
+        return nil
+    end
+
+    local level_id = gpt_world_safe_method(vertex, "level_id")
+    if type(level_id) ~= "number" then
+        return nil
+    end
+
+    local level_name = gpt_world_safe_method(simulation, "level_name", level_id)
+    if type(level_name) ~= "string" or level_name == "" then
+        return nil
+    end
+
+    return {
+        entity_id = "level:" .. level_name,
+        name = level_name,
+        game_graph_level_id = level_id,
+        game_vertex_id = game_vertex_id
+    }
+end
+
+local function gpt_world_resolve_smart_terrain(simulation, companion, level_name)
+    local smart_terrain_id = gpt_world_safe_index(companion, "m_smart_terrain_id")
+    if type(smart_terrain_id) ~= "number"
+        or smart_terrain_id == GPT_WORLD_NO_SMART_TERRAIN_ID
+        or smart_terrain_id <= 0 then
+        return nil
+    end
+
+    local smart_terrain = gpt_world_safe_method(simulation, "object", smart_terrain_id)
+    if smart_terrain == nil then
+        return nil
+    end
+
+    local smart_terrain_name = gpt_world_safe_method(smart_terrain, "name")
+    if type(smart_terrain_name) ~= "string" or smart_terrain_name == "" then
+        return nil
+    end
+
+    local parent_level = level_name
+    if type(parent_level) ~= "string" or parent_level == "" then
+        parent_level = "unknown"
+    end
+
+    return {
+        entity_id = "smart:" .. parent_level .. ":" .. smart_terrain_name,
+        name = smart_terrain_name,
+        alife_object_id = smart_terrain_id
+    }
+end
+
+-- Returns objective engine context only.
+-- The returned table is not the companion's knowledge and must not be sent
+-- directly to dialogue/LLM as a list of places the character knows.
+--
+-- Success:
+--   snapshot, nil
+-- Failure:
+--   nil, stable_error_code
+function gpt_world.get_companion_location_snapshot()
+    local simulation = gpt_world_get_alife()
+    if simulation == nil then
+        return nil, "alife_unavailable"
+    end
+
+    local companion, companion_id = gpt_world_get_companion_server_object(simulation)
+    if companion == nil then
+        return nil, companion_id
+    end
+
+    local game_vertex_id = gpt_world_get_game_vertex_id(companion)
+    if game_vertex_id == nil then
+        return nil, "companion_game_vertex_unavailable"
+    end
+
+    local graph = gpt_world_get_game_graph()
+    if graph == nil then
+        return nil, "game_graph_unavailable"
+    end
+
+    local level = gpt_world_resolve_level(simulation, graph, game_vertex_id)
+    if level == nil then
+        return nil, "companion_level_unavailable"
+    end
+
+    local smart_terrain = gpt_world_resolve_smart_terrain(simulation, companion, level.name)
+
+    return {
+        companion_story_id = GPT_WORLD_COMPANION_STORY_ID,
+        companion_alife_object_id = companion_id,
+        level = level,
+        smart_terrain = smart_terrain,
+        source = "xray_alife_snapshot"
+    }, nil
+end
