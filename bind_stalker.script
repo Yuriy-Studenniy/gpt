@@ -365,6 +365,33 @@ local function ensure_gpt_companion_spawned(actor)
 	return companion.id, "ready"
 end
 
+-- Loads the domain service through X-Ray's global namespace lazy loader.
+-- The snapshot is diagnostic engine context, not persistent companion knowledge.
+local function gpt_companion_log_world_snapshot(companion_id)
+    local call_ok, snapshot, error_code = pcall(function()
+        return gpt_world.get_companion_location_snapshot()
+    end)
+
+    if not call_ok then
+        printf("[GPT_WORLD] Lazy load/snapshot failed: %s", tostring(snapshot))
+        return
+    end
+
+    if snapshot == nil then
+        printf("[GPT_WORLD] Initial location snapshot unavailable: %s", tostring(error_code))
+        return
+    end
+
+    local level_id = snapshot.level and snapshot.level.entity_id or "unknown"
+    local smart_id = snapshot.smart_terrain and snapshot.smart_terrain.entity_id or "none"
+    printf("[GPT_WORLD] Module loaded; companion=%s level=%s smart=%s online=%s",
+        tostring(companion_id),
+        tostring(level_id),
+        tostring(smart_id),
+        tostring(snapshot.is_online)
+    )
+end
+
 local function gpt_update_companion_setup(binder)
 	if not binder.gpt_companion_diagnostic_logged then
 		binder.gpt_companion_diagnostic_logged = true
@@ -393,6 +420,7 @@ local function gpt_update_companion_setup(binder)
 		binder.gpt_companion_setup_retry_at = nil
 		printf("[GPT_COMPANION] Setup complete: companion=%s", tostring(companion_id))
 		gpt_companion_diagnostic("Setup complete companion " .. tostring(companion_id))
+		gpt_companion_log_world_snapshot(companion_id)
 		return
 	end
 
