@@ -41,12 +41,14 @@ local function gpt_companion_spawn_point(actor)
 	end
 
 	printf("[GPT_COMPANION] No safe nearby spawn vertex found")
+	log("[GPT_COMPANION] No safe nearby spawn vertex found")
 	return nil, nil
 end
 
 local function ensure_gpt_companion_squad(companion_id, actor)
 	local story_id = "gpt_companion_squad"
 	local existing_id = get_story_object_id(story_id)
+	log("[GPT_COMPANION] Squad Story ID lookup: " .. tostring(existing_id))
 	local squad = nil
 
 	if existing_id ~= nil then
@@ -164,7 +166,9 @@ end
 -- Create the unique stalker once, then reuse the saved A-Life object.
 local function ensure_gpt_companion_spawned(actor)
 	local story_id = "gpt_companion_main"
+	log("[GPT_COMPANION] Spawn routine entered")
 	local existing_id = get_story_object_id(story_id)
+	log("[GPT_COMPANION] Companion Story ID lookup: " .. tostring(existing_id))
 
 	if existing_id ~= nil then
 		local existing_object = alife():object(existing_id)
@@ -181,8 +185,10 @@ local function ensure_gpt_companion_spawned(actor)
 
 	local spawn_position, spawn_vertex_id = gpt_companion_spawn_point(actor)
 	if spawn_position == nil or spawn_vertex_id == nil then
+		log("[GPT_COMPANION] Spawn aborted: no_safe_spawn_point")
 		return nil, "no_safe_spawn_point"
 	end
+	log("[GPT_COMPANION] Safe spawn vertex found: " .. tostring(spawn_vertex_id))
 
 	local companion = alife():create(
 		"gpt_companion_main",
@@ -197,6 +203,7 @@ local function ensure_gpt_companion_spawned(actor)
 	end
 
 	printf("[GPT_COMPANION] Created unique companion: id=%s", tostring(companion.id))
+	log("[GPT_COMPANION] Created unique companion: id=" .. tostring(companion.id))
 	local squad_id, setup_status = ensure_gpt_companion_squad(companion.id, actor)
 	if squad_id == nil then
 		return nil, setup_status
@@ -206,6 +213,11 @@ local function ensure_gpt_companion_spawned(actor)
 end
 
 local function gpt_update_companion_setup(binder)
+	if not binder.gpt_companion_diagnostic_logged then
+		binder.gpt_companion_diagnostic_logged = true
+		log("[GPT_COMPANION] actor_binder setup updater entered")
+	end
+
 	if binder.gpt_companion_setup_complete or binder.gpt_companion_setup_blocked then
 		return
 	end
@@ -219,6 +231,7 @@ local function gpt_update_companion_setup(binder)
 	local call_ok, companion_id, setup_status = pcall(ensure_gpt_companion_spawned, binder.object)
 	if not call_ok then
 		setup_status = "setup_exception: " .. tostring(companion_id)
+		log("[GPT_COMPANION] Setup exception: " .. tostring(companion_id))
 		companion_id = nil
 	end
 
@@ -226,6 +239,7 @@ local function gpt_update_companion_setup(binder)
 		binder.gpt_companion_setup_complete = true
 		binder.gpt_companion_setup_retry_at = nil
 		printf("[GPT_COMPANION] Setup complete: companion=%s", tostring(companion_id))
+		log("[GPT_COMPANION] Setup complete: companion=" .. tostring(companion_id))
 		return
 	end
 
@@ -234,6 +248,7 @@ local function gpt_update_companion_setup(binder)
 	if setup_status == "companion_dead" or setup_status == "companion_in_other_group" then
 		binder.gpt_companion_setup_blocked = true
 		printf("[GPT_COMPANION] Setup halted: %s", tostring(setup_status))
+		log("[GPT_COMPANION] Setup halted: " .. tostring(setup_status))
 		return
 	end
 
@@ -245,6 +260,8 @@ local function gpt_update_companion_setup(binder)
 		retry_delay = 60000
 	end
 	binder.gpt_companion_setup_retry_at = now + retry_delay
+	log("[GPT_COMPANION] Setup attempt " .. tostring(binder.gpt_companion_setup_attempts)
+		.. " failed (" .. tostring(setup_status) .. "); retry in " .. tostring(retry_delay) .. " ms")
 	printf("[GPT_COMPANION] Setup attempt %s failed (%s); retry in %s ms",
 		tostring(binder.gpt_companion_setup_attempts), tostring(setup_status), tostring(retry_delay))
 end
