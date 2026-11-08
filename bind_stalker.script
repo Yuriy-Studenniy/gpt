@@ -373,20 +373,27 @@ local function gpt_world_log_module_status(binder)
 	end
 	binder.gpt_world_module_checked = true
 
+	-- Console markers are visible in xray_administrator.log on retail CoP.
+	-- printf output is not guaranteed to be written to that file.
+	gpt_companion_diagnostic("world_module_probe_entered")
+
 	local call_ok, levels = pcall(function()
 		return gpt_world.get_catalog_levels()
 	end)
 
 	if not call_ok then
+		gpt_companion_diagnostic("world_module_load_failed " .. string.sub(tostring(levels), 1, 120))
 		printf("[GPT_WORLD] Module load failed: %s", tostring(levels))
 		return
 	end
 
 	if type(levels) ~= "table" then
+		gpt_companion_diagnostic("world_module_api_invalid_level_catalog")
 		printf("[GPT_WORLD] Module API returned invalid level catalog")
 		return
 	end
 
+	gpt_companion_diagnostic("world_module_loaded_levels_" .. tostring(#levels))
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
 end
 
