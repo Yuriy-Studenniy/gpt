@@ -180,6 +180,7 @@ Smart Terrain не следует автоматически считать по
 - **get_known_places(filters)** — возвращает только сущности с положительным `known_place` claim; каталог сам по себе не открывает места;
 - **record_observation(event)** — принимает только явно подтверждённое событие `place_observed` (с `level_id`, если место ещё не внесено в каталог) и создаёт claim со статусом `observed`;
 - **get_companion_world_context(companion_alife_id?)** — возвращает раздельные поля `engine` (текущие факты X-Ray) и `knowledge` (только явные claims).
+- **run_knowledge_api_self_test(companion_alife_id)** — диагностическая функция: проверяет public claims/observation/context API на временном изолированном хранилище и восстанавливает исходную таблицу и sequence ID даже после ошибки. Не предназначена для игрового диалога.
 
 У API должно быть явное разделение catalog и knowledge. Функция, возвращающая каталог, не должна использоваться LLM как перечень уже известных персонажу мест.
 
