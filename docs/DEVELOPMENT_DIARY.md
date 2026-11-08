@@ -635,3 +635,17 @@
 - Уточнение внесено в WORLD_MODEL_DESIGN.md, чтобы не перепутать служебные группы A-Life с идентификаторами карты.
 - Завершена сверка навигационной документации: docs/README.md указывает на новый дизайн главы 2, а PROJECT_STATUS.md отражает текущий этап и отложенные проверки первой главы.
 - Дополнительные коммиты синхронизации документов: cc2759bd7b331b9f89bf9c121cc95ef4ae2e7c07, 69cc23938c1272e6f0a4e946135b0256fb67f725, 74491be76231a819a1d654590ec03faa7032e6a8, 0f3a0cca0312d9e8dcef62fd63576b4fc70e2dca.
+
+
+### Первый read-only адаптер географического состояния — 2026-11-08
+
+- Создан отдельный исходник gpt_world.script с таблицей gpt_world и методом get_companion_location_snapshot(). Его задача — прочитать объективную текущую локацию уникального спутника; он не записывает знания, не обходит все объекты карты, не меняет поведение NPC и не вызывается каждый тик.
+- Поиск компаньона использует штатную get_story_object_id("gpt_companion_main") из _g.script и alife():object(id).
+- Для online NPC предпочитается db.storage[id].object и его актуальный game_vertex_id(); для offline используется server-side A-Life объект и его m_game_vertex_id. Такой online/offline выбор соответствует уже существующей логике arrived_to_smart() в smart_terrain.script.
+- Получение уровня: game_graph():vertex(game_vertex_id):level_id() → alife():level_name(level_id). Связка level_id → level_name уже используется в se_smart_terrain:on_before_register().
+- Smart Terrain читается через m_smart_terrain_id с проверкой sentinel 65535, затем по A-Life ID запрашивается объект и его name(). Для стабильной ссылки формируется строковый smart:<level>:<name>; временный A-Life object ID остаётся только частью snapshot/диагностики, а не долговременным entity ID.
+- API возвращает snapshot и nil либо nil вместе с кодом ошибки; отсутствующие объекты/поля не превращаются в придуманные значения. Неопределённость Smart Terrain допускается: спутник может не быть назначен в smart.
+- Статически проверены источники: wrapper Story ID в _g.script; наличие db.storage и размещение online object; online/offline game vertex ветка в smart_terrain.script; mapping уровня в se_smart_terrain:on_before_register(); поля m_game_vertex_id/m_smart_terrain_id и метод game_vertex_id() в локальном lua_help.script.
+- Важная граница: gpt_world.script пока не подключён к script loader, modules.script или binders и не включён в INSTALLATION.md. Поэтому на данном этапе это отдельный проверенный по исходникам адаптерный код, но не функция, доступная во время игры. Способ загрузки нового общего модуля в оригинальном X-Ray нужно определить отдельно; нельзя имитировать загрузку добавлением в список NPC-схем.
+- Lua-компилятор и CoP runtime не запускались. Не заявлять компиляцию, установку или игровую проверку.
+- Коммиты модуля: a01fc252585a40991c57be93757abe4b698aa0f8, 30900203760b40f6fa55bbcbc9c3550e0fe9cd60, a886751f75dca180a87097beb6864b24379759c5. Синхронизация архитектуры и статуса: d58b182aa3720b3bb64647664103772859667e0d и fc05e2e31c12e218b4d3d3ccf7740df1d8edbf0d.
