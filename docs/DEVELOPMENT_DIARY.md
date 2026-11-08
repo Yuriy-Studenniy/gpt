@@ -703,3 +703,12 @@
 - В `gpt_world_log_module_status()` добавлены явные маркеры: `gpt_companion_diag_world_module_probe_entered`, `gpt_companion_diag_world_module_loaded_levels_5` при успехе, `gpt_companion_diag_world_module_load_failed_...` при ошибке, либо `gpt_companion_diag_world_module_api_invalid_level_catalog` при неверном API-ответе. Ошибка вызова остаётся под `pcall` и не влияет на companion setup.
 - Ожидается, что все маркеры будут видны как строки `Unknown command: ...`, по аналогии с уже имеющимися companion diagnostics. Это следующий проверяемый тест; Lua-компиляция и запуск игры разработчиком не выполнялись.
 - Кодовый коммит: `891f532bad052383c0a1dc269098ce2de56f36cb`.
+
+
+### Runtime-подтверждение lazy-load World Model — 2026-11-08
+
+- Пользователь запустил игру с независимым World Model probe и прислал строки из `xray_administrator.log`: `gpt_companion_diag_world_module_probe_entered` и `gpt_companion_diag_world_module_loaded_levels_5`.
+- Это подтверждает, что в оригинальном CoP 1.6.02 обращение к `gpt_world.get_catalog_levels()` вызвало X-Ray global namespace lazy loader и вернуло массив каталога из пяти уровней. Загрузка `gpt_world.script` и доступность level catalog API подтверждены в игре.
+- Последующие маркеры показывают вход в companion setup, поиск безопасной точки и создание NPC с ID 12041. `Squad_Story_ID_lookup_nil` означает, что ранее зарегистрированный squad по этому Story ID не найден; сам по себе этот результат не является ошибкой и предшествует ветке создания нового squad. По присланному набору маркеров нельзя отдельно подтвердить завершение регистрации squad.
+- Строки `Unknown command: gpt_companion_diag_...` — ожидаемое отображение диагностических маркеров, отправленных через игровую консоль; они не означают отказ lazy loader. Последующим коммитом `43309c34eea296b7b6aa5f2815654d8deb8da105` диагностический helper очищен от синтетических console-команд; это устраняет шум в логе и не меняет функциональный код World Model.
+- Проверка snapshot уровня/Smart Terrain остаётся отдельным пунктом: вызов snapshot привязан к успешному завершению companion A-Life setup. Полный regression-прогон главы 1 не объявляется завершённым.
