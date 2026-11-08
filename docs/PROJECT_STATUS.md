@@ -215,3 +215,13 @@
 - Исправлено: проверка companion Story ID в `motivator_binder:update()` переведена на `get_object_story_id(object:id())`.
 - Commit: `3dc25f6c1eee02a6fede2d992f30418e764b23dc`.
 - Это устраняет конкретную ошибку из лога, но не доказывает, что других runtime-проблем нет. Нужен повторный единый запуск на новой игре; Lua runtime/движок здесь не запускались.
+
+
+### Второй игровой запуск — причина отсутствия NPC и исправление Story ID lookup — 2026-11-08
+
+- После устранения fatal error пользователь подтвердил, что игра больше не вылетает, но companion не появляется.
+- Найдена вторая часть той же несовместимости: `bind_stalker.script` вызывал несуществующий глобальный `get_story_objects_registry()` внутри `pcall`. Исключение перехватывалось в setup, поэтому игровой процесс продолжался, а спавн не выполнялся.
+- В целевом ванильном `_g.script` присутствуют штатные обёртки `get_story_object_id(story_id)` и `unregister_story_id(story_id)`. Они используют модуль `story_objects.get_story_objects_registry()` корректным путём.
+- В `bind_stalker.script` оба lookup (NPC и squad) переведены на `get_story_object_id`, а обе очистки stale Story ID — на `unregister_story_id`. Других прямых вызовов `get_story_objects_registry()` в `bind_stalker.script` не осталось.
+- Commit: `eca2cd6d37d0414b0662e30387d268d6ed7182e4`.
+- Статически подтверждено наличие wrapper-функций в `_g.script` и engine API `level.vertex_in_direction` / `actor:accessible` в `lua_help.script`. Сам успешный spawn и регистрацию squad нужно подтвердить в игре.
