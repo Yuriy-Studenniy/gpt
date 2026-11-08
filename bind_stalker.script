@@ -46,14 +46,13 @@ end
 
 local function ensure_gpt_companion_squad(companion_id, actor)
 	local story_id = "gpt_companion_squad"
-	local registry = get_story_objects_registry()
-	local existing_id = registry:get(story_id)
+	local existing_id = get_story_object_id(story_id)
 	local squad = nil
 
 	if existing_id ~= nil then
 		squad = alife():object(existing_id)
 		if squad == nil then
-			registry:unregister_by_story_id(story_id)
+			unregister_story_id(story_id)
 		end
 	end
 
@@ -165,8 +164,7 @@ end
 -- Create the unique stalker once, then reuse the saved A-Life object.
 local function ensure_gpt_companion_spawned(actor)
 	local story_id = "gpt_companion_main"
-	local registry = get_story_objects_registry()
-	local existing_id = registry:get(story_id)
+	local existing_id = get_story_object_id(story_id)
 
 	if existing_id ~= nil then
 		local existing_object = alife():object(existing_id)
@@ -178,7 +176,7 @@ local function ensure_gpt_companion_spawned(actor)
 			end
 			return existing_id, "ready"
 		end
-		registry:unregister_by_story_id(story_id)
+		unregister_story_id(story_id)
 	end
 
 	local spawn_position, spawn_vertex_id = gpt_companion_spawn_point(actor)
