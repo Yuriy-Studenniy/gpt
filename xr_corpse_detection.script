@@ -425,7 +425,12 @@ local function gpt_begin_loot_context(npc)
 	gpt_loot_detector_rank = 0
 	npc:iterate_inventory(gpt_count_loot_inventory, npc)
 
-	local needs = gpt_companion_get_needs()
+	local needs = nil
+	if type(gpt_companion_get_needs) == "function" then
+		needs = gpt_companion_get_needs()
+	else
+		printf("[GPT_COMPANION] Need API is unavailable during corpse scan")
+	end
 	local hunger = needs and needs.hunger or 0
 	local thirst = needs and needs.thirst or 0
 
