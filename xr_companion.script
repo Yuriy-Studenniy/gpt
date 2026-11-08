@@ -3,7 +3,8 @@ local min_distance = 1
 
 local keep_state_min_time = 1000 -- ïåðåêëþ÷èâøèñü â ñîñòîÿíèå (áåã, õîäüáà, ñïðèíò), íå ïåðåêëþ÷àòüñÿ â äðóãîå N ms
 
-local dist_walk = 1.5 -- keep slow walking only for the final approach; use a quicker pace when farther away
+local dist_walk = 1.5 -- walking is allowed only while the companion is within this distance of the actor
+local dist_run = 20 -- use the running follow state beyond the walk distance
 local dist_run = 20
 -- otherwise - sprint
 
@@ -102,7 +103,9 @@ function action_companion_activity:beh_walk_simple()
 			self.keep_state_until = t + keep_state_min_time
 
 			--printf("_bp: move_mgr: distance to destination waypoint: %d", dist_to_assist_pt)
-			if dist_to_assist_pt <= dist_walk then
+			-- Select pace from the real gap to the player, not the offset assist
+			-- waypoint (which is deliberately placed beside the player).
+			if dist_from_self_to_actor <= dist_walk then
 				new_state = "raid"
 				target = {look_object = get_story_object("actor")}
 			elseif dist_to_assist_pt <= dist_run then
