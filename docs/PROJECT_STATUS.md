@@ -206,3 +206,12 @@
 - В стартовый комплект добавлен один энергетик для проверки thirst cycle.
 - Для companion добавлен denylist всех уникальных секций, перечисленных в текущем loot whitelist. Для обычных NPC глобальный whitelist остаётся неизменным.
 - Игровой код после этих правок требует статической проверки diff/структуры и последующего одного in-game прогона.
+
+
+### Первый игровой запуск CoP 1.6.02 — исправление API Story ID — 2026-11-08
+
+- Пользовательский лог подтвердил загрузку `gamedata/scripts/xr_motivator.script` и завершился Lua fatal error на строке 501: `attempt to call global 'get_story_objects_registry' (a nil value)`.
+- Причина: `get_story_objects_registry()` не является доступной глобальной функцией в оригинальном CoP 1.6.02. В том же `xr_motivator.script` уже используется ванильная `get_object_story_id(object_id)`.
+- Исправлено: проверка companion Story ID в `motivator_binder:update()` переведена на `get_object_story_id(object:id())`.
+- Commit: `3dc25f6c1eee02a6fede2d992f30418e764b23dc`.
+- Это устраняет конкретную ошибку из лога, но не доказывает, что других runtime-проблем нет. Нужен повторный единый запуск на новой игре; Lua runtime/движок здесь не запускались.
