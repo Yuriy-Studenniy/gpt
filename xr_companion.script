@@ -3,7 +3,7 @@ local min_distance = 1
 
 local keep_state_min_time = 1000 -- ïåðåêëþ÷èâøèñü â ñîñòîÿíèå (áåã, õîäüáà, ñïðèíò), íå ïåðåêëþ÷àòüñÿ â äðóãîå N ms
 
-local dist_walk = 4 -- < dist_run
+local dist_walk = 1.5 -- keep slow walking only for the final approach; use a quicker pace when farther away
 local dist_run = 20
 -- otherwise - sprint
 
