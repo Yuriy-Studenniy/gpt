@@ -695,20 +695,22 @@ local function gpt_world_resolve_smart_terrain(simulation, server_companion, onl
     if type(smart_terrain_id) ~= "number" then
         smart_terrain_id = gpt_world_safe_index(server_companion, "m_smart_terrain_id")
     end
-    if type(smart_terrain_id) ~= "number"
-        or smart_terrain_id == GPT_WORLD_NO_SMART_TERRAIN_ID
-        or smart_terrain_id <= 0 then
-        return nil
+
+    if type(smart_terrain_id) ~= "number" then
+        return nil, "smart_terrain_id_unavailable", nil
+    end
+    if smart_terrain_id == GPT_WORLD_NO_SMART_TERRAIN_ID or smart_terrain_id <= 0 then
+        return nil, "no_smart_terrain_assigned", smart_terrain_id
     end
 
     local smart_terrain = gpt_world_safe_method(simulation, "object", smart_terrain_id)
     if smart_terrain == nil then
-        return nil
+        return nil, "smart_terrain_object_unavailable", smart_terrain_id
     end
 
     local smart_terrain_name = gpt_world_safe_method(smart_terrain, "name")
     if type(smart_terrain_name) ~= "string" or smart_terrain_name == "" then
-        return nil
+        return nil, "smart_terrain_name_unavailable", smart_terrain_id
     end
 
     local parent_level = level_name
@@ -720,7 +722,7 @@ local function gpt_world_resolve_smart_terrain(simulation, server_companion, onl
         entity_id = "smart:" .. parent_level .. ":" .. smart_terrain_name,
         name = smart_terrain_name,
         alife_object_id = smart_terrain_id
-    }
+    }, "resolved", smart_terrain_id
 end
 
 -- Returns objective engine context only.
@@ -766,7 +768,7 @@ function gpt_world.get_companion_location_snapshot(companion_alife_id)
         return nil, "companion_level_unavailable"
     end
 
-    local smart_terrain = gpt_world_resolve_smart_terrain(
+    local smart_terrain, smart_terrain_status, smart_terrain_id = gpt_world_resolve_smart_terrain(
         simulation,
         companion,
         online_companion,
@@ -779,6 +781,8 @@ function gpt_world.get_companion_location_snapshot(companion_alife_id)
         is_online = online_companion ~= nil,
         level = level,
         smart_terrain = smart_terrain,
+        smart_terrain_status = smart_terrain_status,
+        smart_terrain_alife_object_id = smart_terrain_id,
         source = "xray_alife_snapshot"
     }, nil
 end
