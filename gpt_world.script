@@ -1055,6 +1055,16 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         probe_passed = false
     }
 
+    local initial_snapshot, initial_snapshot_error =
+        gpt_world.get_companion_location_snapshot(companion_alife_id)
+    if type(initial_snapshot) ~= "table"
+        or type(initial_snapshot.level) ~= "table"
+        or type(initial_snapshot.level.entity_id) ~= "string" then
+        result.error = "engine_snapshot_unavailable:" .. tostring(initial_snapshot_error)
+        return result, "self_test_engine_snapshot_unavailable"
+    end
+    local test_level_id = initial_snapshot.level.entity_id
+
     local previous_claims = GPT_WORLD_CLAIMS
     local previous_next_claim_id = GPT_WORLD_NEXT_CLAIM_ID
     GPT_WORLD_CLAIMS = {}
@@ -1063,7 +1073,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
     local run_ok, run_error = pcall(function()
         local claim, claim_error = gpt_world.record_claim({
             subject_id = "poi:gpt_world_self_test:claim",
-            level_id = "level:zaton",
+            level_id = test_level_id,
             predicate = "known_place",
             value = true,
             status = "observed",
@@ -1106,10 +1116,10 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         result.claim_read_ok = true
 
         local zaton_places = gpt_world.get_known_places({
-            level_id = "level:zaton"
+            level_id = test_level_id
         })
         local jupiter_places = gpt_world.get_known_places({
-            level_id = "level:jupiter"
+            level_id = "level:gpt_world_self_test_other"
         })
         if type(zaton_places) ~= "table" or #zaton_places ~= 1
             or zaton_places[1].entity_id ~= "poi:gpt_world_self_test:claim"
@@ -1122,7 +1132,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
             event_type = "place_observed",
             confirmed = true,
             entity_id = "poi:gpt_world_self_test:observation",
-            level_id = "level:zaton",
+            level_id = test_level_id,
             source_id = "gpt_world_self_test_event",
             created_at = 2,
             confidence = 0.95
@@ -1141,7 +1151,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
             event_type = "place_observed",
             confirmed = false,
             entity_id = "poi:gpt_world_self_test:unconfirmed",
-            level_id = "level:zaton",
+            level_id = test_level_id,
             source_id = "gpt_world_self_test_event",
             created_at = 3
         })
@@ -1164,6 +1174,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
             error("world_context_knowledge_mismatch")
         end
         result.context_level_entity_id = context.engine.level.entity_id
+        result.test_level_entity_id = test_level_id
         result.context_is_online = context.engine.is_online == true
         result.context_ok = true
     end)
