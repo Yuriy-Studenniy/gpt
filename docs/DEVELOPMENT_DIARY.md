@@ -731,3 +731,12 @@
 - `gpt_world_resolve_smart_terrain()` теперь возвращает статус причины: `resolved`, `no_smart_terrain_assigned`, `smart_terrain_id_unavailable`, `smart_terrain_object_unavailable` или `smart_terrain_name_unavailable`. Эти статусы не заменяют сам факт location snapshot и не превращают отсутствие Smart Terrain в ошибку.
 - Runtime-проверка новой версии ещё не выполнена. Статическая проверка и проверка структуры Lua-кода не заменяют запуск в оригинальном CoP 1.6.02.
 - Коммиты: `gpt_world.script` `06a9c0d8bb64589cfb4533db163d0653f19f6d70`; `bind_stalker.script` `62a09c2129933f8d4a66f156da22f14578090150`.
+
+
+## 2026-11-08 — Runtime подтверждение companion location snapshot
+
+- Пользовательский runtime-лог показал пять успешных замеров подряд: `level_zaton`, `online_true`, `smart_none`, `smart_status_no_smart_terrain_assigned`, `smart_id_65535`, `read_ok`.
+- Это закрывает runtime-проверку прямого A-Life snapshot: спутник найден как online object, игровой уровень Затон корректно разрешён из game graph. `65535` — sentinel отсутствующего Smart Terrain assignment; отсутствие smart не означает ошибку snapshot.
+- В существующем companion design offline simulation squad ориентируется на игрока, а не выбирает Smart Terrain. Поэтому назначать спутнику произвольный Smart Terrain нельзя: такое назначение исказило бы игровую модель. Smart Terrain остаётся optional metadata, возвращается только при реальном назначении.
+- Polling criterion уточнён: snapshot polling завершается после подтверждения `is_online == true`; наличие Smart Terrain не требуется. Это предотвращает повторение пяти одинаковых замеров и лишние диагностические строки.
+- Runtime новой версии с обновлённым polling stop condition ещё не проверен; он меняет только критерий окончания диагностики, а не чтение игровых данных.
