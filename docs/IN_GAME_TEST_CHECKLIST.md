@@ -19,7 +19,7 @@
 - [ ] NPC зарегистрирован с уникальным Story ID gpt_companion_main, squad — gpt_companion_squad.
 - [ ] В логе есть `[GPT_COMPANION] Created unique companion` и `Setup complete`; нет повторяющегося `setup_exception`.
 - [ ] Диагностика из bind_stalker.script: лог содержит команды `gpt_companion_diag_actor_binder_setup_updater_entered`, `gpt_companion_diag_spawn_routine_entered`, результат Story ID lookup и итоговый статус; при ошибке записан точный этап.
-- [ ] Независимо от результата настройки A-Life отряда лог содержит `[GPT_WORLD] Module loaded; levels=5` либо `[GPT_WORLD] Module load failed: ...`; это проверяет сам lazy loader отдельно от companion setup.
+- [ ] Независимо от результата настройки A-Life отряда лог содержит `gpt_companion_diag_world_module_probe_entered`, а затем `gpt_companion_diag_world_module_loaded_levels_5` либо `gpt_companion_diag_world_module_load_failed_...`; это проверяет lazy loader по видимым retail console-маркерам.
 - [ ] После успешной настройки спутника лог содержит `[GPT_WORLD] Companion location snapshot; ...` с корректным `level:...` и `online=true/false`. Отсутствие Smart Terrain допустимо, если squad ещё не назначен.
 - [ ] Повторные обновления игрока и повторная загрузка не создают второго NPC или второго squad.
 - [ ] Если безопасной точки спавна нет, NPC не появляется поверх игрока; повторная попытка не создаёт дубликат.
