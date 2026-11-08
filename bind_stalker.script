@@ -483,41 +483,6 @@ end
 -- Claims API self-test remains available in gpt_world.script but is not
 -- executed from actor_binder:update; keeping the spawn path free of test work.
 
--- Engine-backed context is checked separately from the pure knowledge store.
-local function gpt_companion_log_world_context(companion_id)
-	gpt_world_snapshot_marker("context_probe_entered")
-	local call_ok, context, context_error = pcall(function()
-		return gpt_world.get_companion_world_context(companion_id)
-	end)
-	if not call_ok then
-		gpt_world_snapshot_marker("context_call_failed", string.sub(tostring(context), 1, 56))
-		return false
-	end
-	if type(context) ~= "table" then
-		gpt_world_snapshot_marker("context_unavailable", context_error or "no_result")
-		return false
-	end
-
-	local engine = context.engine
-	local level = type(engine) == "table" and engine.level or nil
-	if type(level) ~= "table" or type(level.name) ~= "string" then
-		gpt_world_snapshot_marker("context_level_unavailable")
-		return false
-	end
-	gpt_world_snapshot_marker("context_level", level.name)
-	gpt_world_snapshot_marker("context_online", tostring(engine.is_online))
-
-	if engine.is_online ~= true or type(context.knowledge) ~= "table"
-		or context.knowledge.persistence ~= "session_only"
-		or type(context.knowledge.known_places) ~= "table" then
-		gpt_world_snapshot_marker("context_validation_failed")
-		return false
-	end
-
-	gpt_world_snapshot_marker("context_probe_passed")
-	return true
-end
-
 local function gpt_update_world_snapshot(binder, now)
 	local companion_id = binder.gpt_world_snapshot_companion_id
 	if companion_id == nil or binder.gpt_world_snapshot_done then
@@ -544,21 +509,8 @@ local function gpt_update_world_snapshot(binder, now)
 	local online_confirmed = snapshot ~= nil and snapshot.is_online == true
 	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
 	if online_confirmed then
-		if not binder.gpt_world_context_api_checked then
-			binder.gpt_world_context_api_checked = true
-			local context_call_ok, context_result = pcall(
-				gpt_companion_log_world_context,
-				companion_id
-			)
-			if not context_call_ok then
-				gpt_world_snapshot_marker("context_dispatch_failed",
-					string.sub(tostring(context_result), 1, 48))
-			elseif context_result == true then
-				gpt_world_snapshot_marker("context_dispatch_passed")
-			else
-				gpt_world_snapshot_marker("context_dispatch_completed_with_failure")
-			end
-		end
+		-- Keep the actor update path limited to the already-validated read-only
+		-- snapshot. Knowledge/context self-tests must never gate companion setup.
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
@@ -665,7 +617,6 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
-	self.gpt_world_context_api_checked = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -702,7 +653,6 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
-	self.gpt_world_context_api_checked = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
