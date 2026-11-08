@@ -365,7 +365,31 @@ local function ensure_gpt_companion_spawned(actor)
 	return companion.id, "ready"
 end
 
--- Loads the domain service through X-Ray's global namespace lazy loader.
+-- Probe the World Model independently from companion/squad setup.
+-- Reading the global invokes X-Ray's namespace lazy loader for gpt_world.script.
+local function gpt_world_log_module_status(binder)
+	if binder.gpt_world_module_checked then
+		return
+	end
+	binder.gpt_world_module_checked = true
+
+	local call_ok, levels = pcall(function()
+		return gpt_world.get_catalog_levels()
+	end)
+
+	if not call_ok then
+		printf("[GPT_WORLD] Module load failed: %s", tostring(levels))
+		return
+	end
+
+	if type(levels) ~= "table" then
+		printf("[GPT_WORLD] Module API returned invalid level catalog")
+		return
+	end
+
+	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
+end
+
 -- The snapshot is diagnostic engine context, not persistent companion knowledge.
 local function gpt_companion_log_world_snapshot(companion_id)
     local call_ok, snapshot, error_code = pcall(function()
@@ -384,7 +408,7 @@ local function gpt_companion_log_world_snapshot(companion_id)
 
     local level_id = snapshot.level and snapshot.level.entity_id or "unknown"
     local smart_id = snapshot.smart_terrain and snapshot.smart_terrain.entity_id or "none"
-    printf("[GPT_WORLD] Module loaded; companion=%s level=%s smart=%s online=%s",
+    printf("[GPT_WORLD] Companion location snapshot; companion=%s level=%s smart=%s online=%s",
         tostring(companion_id),
         tostring(level_id),
         tostring(smart_id),
@@ -798,7 +822,10 @@ function actor_binder:update(delta)
 		self.loaded = true
 	end
 
-	-- Companion setup is independent from the actor's one-time world-load work.
+	-- Validate the World Model loader independently from companion setup.
+	-- This diagnostic must run even if A-Life squad initialization is pending.
+	gpt_world_log_module_status(self)
+
 	-- A temporary A-Life failure must not permanently suppress later attempts.
 	gpt_update_companion_setup(self)
 
