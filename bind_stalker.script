@@ -375,7 +375,9 @@ end
 
 -- Probe the World Model independently from companion/squad setup.
 -- Reading the global invokes X-Ray's namespace lazy loader for gpt_world.script.
--- Forward declaration lets module-load verification run before companion spawn.
+-- Forward declarations let module-load verification use the same tested
+-- helper and diagnostic channel as the later engine-context probe.
+local gpt_world_snapshot_marker
 local gpt_companion_log_knowledge_api
 
 local function gpt_world_log_module_status(binder)
@@ -430,7 +432,7 @@ end
 -- Retail X-Ray's reliable diagnostic channel in this project is a harmless
 -- synthetic console command: the engine logs "Unknown command" with the marker.
 -- Do not replace this with printf; it is not visible in the target retail setup.
-local function gpt_world_snapshot_marker(name, value)
+gpt_world_snapshot_marker = function(name, value)
 	local token = tostring(name)
 	if value ~= nil then
 		token = token .. "_" .. tostring(value)
