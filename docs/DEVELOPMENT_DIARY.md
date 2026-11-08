@@ -518,3 +518,13 @@
 - Ошибка означала обращение к несуществующему глобальному API оригинального CoP 1.6.02. В этом же файле ранее использовалась ванильная `get_object_story_id()`, поэтому companion check переключён на неё.
 - Правка: commit `3dc25f6c1eee02a6fede2d992f30418e764b23dc`.
 - Статически проверен точный diff: изменена только одна строка условия companion ID. Фактическое исправление подтверждается повторным запуском игры; следующий запуск остаётся обязательным.
+
+
+### Второй игровой запуск — исправление отсутствующего companion spawn — 2026-11-08
+
+- Пользователь подтвердил: после замены `xr_motivator.script` игра перестала вылетать, но NPC рядом не появился.
+- В `bind_stalker.script` найдено оставшееся обращение к несуществующей глобальной `get_story_objects_registry()`. Оно находилось внутри `pcall` в setup и превращалось в `setup_exception` с повтором по backoff, а не в fatal crash.
+- В локальном ванильном `_g.script` найдены обёртки `get_story_object_id(story_obj_id)` и `unregister_story_id(story_id)`; они вызывают `story_objects.get_story_objects_registry()` внутри правильного Lua-модуля.
+- В обоих местах поиска существующего NPC/squad заменено на `get_story_object_id`, очистка stale IDs переведена на `unregister_story_id`. Commit `eca2cd6d37d0414b0662e30387d268d6ed7182e4`.
+- По `lua_help.script` дополнительно подтверждено наличие `level.vertex_in_direction(number, vector, number)` и `actor:accessible(number)` для подбора безопасной точки.
+- Правка устраняет конкретное препятствие до spawn point. Не заявлять, что companion уже появился: необходим следующий игровой запуск и подтверждение лога `[GPT_COMPANION] Created unique companion` / `Setup complete`.
