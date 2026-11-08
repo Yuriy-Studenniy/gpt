@@ -6560,7 +6560,7 @@
 		<money min="500" max="1000" infinitive="0"/>
 		<supplies>
 			[spawn] \n
-			wpn_ak74u = 1 \n
+			wpn_ak74 = 1 \n
 			ammo_5.45x39_fmj = 2 \n
 			wpn_pm = 1 \n
 			ammo_9x18_fmj = 2 \n
