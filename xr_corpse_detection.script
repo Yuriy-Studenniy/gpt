@@ -404,7 +404,7 @@ end
 
 local function gpt_begin_loot_context(npc)
 	-- Preserve vanilla looting for every NPC except our unique companion.
-	if npc == nil or get_story_objects_registry():get_story_id(npc:id()) ~= "gpt_companion_main" then
+	if npc == nil or get_object_story_id(npc:id()) ~= "gpt_companion_main" then
 		gpt_loot_target = nil
 		gpt_loot_counts = nil
 		gpt_loot_needs = nil
