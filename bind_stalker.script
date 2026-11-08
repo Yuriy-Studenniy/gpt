@@ -375,10 +375,8 @@ end
 
 -- Probe the World Model independently from companion/squad setup.
 -- Reading the global invokes X-Ray's namespace lazy loader for gpt_world.script.
--- Forward declarations let module-load verification use the same tested
--- helper and diagnostic channel as the later engine-context probe.
+-- Forward declaration for the retail X-Ray diagnostic marker helper.
 local gpt_world_snapshot_marker
-local gpt_companion_log_knowledge_api
 
 local function gpt_world_log_module_status(binder)
 	if binder.gpt_world_module_checked then
@@ -409,24 +407,6 @@ local function gpt_world_log_module_status(binder)
 	gpt_companion_diagnostic("world_module_loaded_levels_" .. tostring(#levels))
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
 
-	-- Test the claim/observation store now, without waiting for an online NPC.
-	-- The test uses an isolated temporary table and restores the live store.
-	if gpt_companion_log_knowledge_api ~= nil then
-		gpt_world_snapshot_marker("knowledge_api_core_dispatch")
-		local probe_call_ok, probe_result = pcall(
-			gpt_companion_log_knowledge_api,
-			nil,
-			"level:gpt_world_self_test"
-		)
-		if not probe_call_ok then
-			gpt_world_snapshot_marker("knowledge_api_core_dispatch_failed",
-				string.sub(tostring(probe_result), 1, 48))
-		elseif probe_result == true then
-			gpt_world_snapshot_marker("knowledge_api_core_dispatch_passed")
-		else
-			gpt_world_snapshot_marker("knowledge_api_core_dispatch_failed")
-		end
-	end
 end
 
 -- Retail X-Ray's reliable diagnostic channel in this project is a harmless
@@ -500,58 +480,8 @@ local function gpt_companion_log_world_snapshot(companion_id)
 	return snapshot, nil
 end
 
--- Retry briefly until the companion is confirmed online. Smart Terrain is
--- optional for this player-following companion and must not block snapshot completion.
--- The isolated claim/observation store test already runs at module load; only the
--- live engine/context adapter is checked here after the companion becomes online.
-gpt_companion_log_knowledge_api = function(companion_id, test_level_id)
-	gpt_world_snapshot_marker("knowledge_api_probe_entered")
-	local call_ok, results, error_code = pcall(function()
-		return gpt_world.run_knowledge_api_self_test(companion_id, test_level_id)
-	end)
-
-	gpt_world_snapshot_marker("knowledge_api_probe_returned")
-	if not call_ok then
-		gpt_world_snapshot_marker("knowledge_api_call_failed", string.sub(tostring(results), 1, 64))
-		return false
-	end
-	if type(results) ~= "table" then
-		gpt_world_snapshot_marker("knowledge_api_call_failed", error_code or "no_result")
-		return false
-	end
-
-	local checks = {
-		"claim_write_ok",
-		"claim_read_ok",
-		"known_places_ok",
-		"observation_ok",
-		"unconfirmed_observation_rejected_ok"
-	}
-	for _, check_name in ipairs(checks) do
-		if results[check_name] == true then
-			gpt_world_snapshot_marker("knowledge_api_" .. check_name)
-		else
-			gpt_world_snapshot_marker("knowledge_api_" .. check_name .. "_failed")
-		end
-	end
-
-	if results.context_skipped == true then
-		gpt_world_snapshot_marker("knowledge_api_context_skipped")
-	elseif results.context_ok == true then
-		gpt_world_snapshot_marker("knowledge_api_context_ok")
-	else
-		gpt_world_snapshot_marker("knowledge_api_context_ok_failed")
-	end
-
-	if results.probe_passed == true then
-		gpt_world_snapshot_marker("knowledge_api_probe_passed")
-	else
-		local failure_detail = results.error or error_code or "assertion"
-		gpt_world_snapshot_marker("knowledge_api_error", string.sub(tostring(failure_detail), 1, 56))
-		gpt_world_snapshot_marker("knowledge_api_probe_failed", error_code or "assertion")
-	end
-	return results.probe_passed == true
-end
+-- Claims API self-test remains available in gpt_world.script but is not
+-- executed from actor_binder:update; keeping the spawn path free of test work.
 
 -- Engine-backed context is checked separately from the pure knowledge store.
 local function gpt_companion_log_world_context(companion_id)
