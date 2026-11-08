@@ -20,7 +20,7 @@
 - [ ] В логе есть `[GPT_COMPANION] Created unique companion` и `Setup complete`; нет повторяющегося `setup_exception`.
 - [ ] Диагностика из bind_stalker.script: лог содержит команды `gpt_companion_diag_actor_binder_setup_updater_entered`, `gpt_companion_diag_spawn_routine_entered`, результат Story ID lookup и итоговый статус; при ошибке записан точный этап.
 - [x] Независимо от результата настройки A-Life отряда лог содержит `gpt_companion_diag_world_module_probe_entered`, а затем `gpt_companion_diag_world_module_loaded_levels_5`. Runtime-проверка подтвердила успешную lazy-load загрузку `gpt_world.script` и возврат каталога из 5 уровней. Префикс `Unknown command:` — ожидаемый побочный эффект диагностических console-маркеров, а не ошибка загрузки.
-- [ ] После успешной настройки спутника лог содержит `[GPT_WORLD] Companion location snapshot; ...` с корректным `level:...` и `online=true/false`. Отсутствие Smart Terrain допустимо, если squad ещё не назначен.
+- [ ] После появления A-Life ID спутника независимо от результата настройки squad лог содержит `gpt_companion_diag_world_snapshot_probe_entered`, затем `..._level_<имя>`, `..._online_true/false`, `..._smart_<имя>` либо `..._smart_none`, и `..._read_ok`. При ошибке ожидается `..._unavailable_<код>` или `..._call_failed_<текст>`. Префикс `Unknown command:` у этих маркеров ожидаем и используется только как видимый retail-log канал.
 - [ ] Повторные обновления игрока и повторная загрузка не создают второго NPC или второго squad.
 - [ ] Если безопасной точки спавна нет, NPC не появляется поверх игрока; повторная попытка не создаёт дубликат.
 - [x] После смерти спутник не создаёт нового NPC — это намеренное текущее поведение. Очистку Story ID/squad после смерти ещё проверить.
@@ -112,7 +112,7 @@
 | Область | Результат | Примечания и шаги воспроизведения |
 |---|---|---|
 | Spawn | Частично подтверждено | Спутник появился; Story ID и отсутствие дубликатов не проверены |
-| World Model lazy loader | **Проверено в игре** | Лог содержит `world_module_probe_entered` и `world_module_loaded_levels_5`; каталог уровней успешно возвращён. Snapshot уровня/Smart Terrain отдельно ещё не подтверждён |
+| World Model lazy loader | **Проверено в игре** | Лог содержит `world_module_probe_entered` и `world_module_loaded_levels_5`; каталог из пяти уровней успешно возвращён. Snapshot уровня/Smart Terrain ещё ожидает проверки по новым маркерам |
 | Follow, combat и healing | Частично подтверждено | Следование, бой и тихая реакция на вооружённого игрока подтверждены; лечение не наблюдалось и отложено |
 | Online/offline и переходы уровней | Отложено | Проверить по мере естественного прохождения, не форсировать ранний переход локаций |
 | Needs, food и save/load | Отложено | Перед игровым тестом добавить диагностический вывод фактических значений hunger/thirst и результата употребления |
