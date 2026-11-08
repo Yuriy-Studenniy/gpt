@@ -740,3 +740,13 @@
 - В существующем companion design offline simulation squad ориентируется на игрока, а не выбирает Smart Terrain. Поэтому назначать спутнику произвольный Smart Terrain нельзя: такое назначение исказило бы игровую модель. Smart Terrain остаётся optional metadata, возвращается только при реальном назначении.
 - Polling criterion уточнён: snapshot polling завершается после подтверждения `is_online == true`; наличие Smart Terrain не требуется. Это предотвращает повторение пяти одинаковых замеров и лишние диагностические строки.
 - Runtime новой версии с обновлённым polling stop condition ещё не проверен; он меняет только критерий окончания диагностики, а не чтение игровых данных.
+
+
+## 2026-11-08 — Первый слой claims и раздельный world context
+
+- В `gpt_world.script` добавлен `get_companion_world_context(companion_alife_id?)`: он возвращает `engine` с объективным A-Life snapshot и отдельно `knowledge` с только явно записанными известными местами.
+- Добавлен session-only claims backend: `record_claim`, `get_claims`, `get_known_places`, `record_observation`. Записи содержат стабильный subject ID, predicate/value, observed/reported/inferred status, source type/ID, confidence, caller-supplied timestamp и last confirmation. Claim ID создаётся последовательно в текущей сессии; лимит 512 записей защищает от неограниченного роста памяти.
+- `record_observation` принимает только событие `place_observed` с `confirmed=true`, идентификатором источника и временем. Это API ещё не подключено к игровому visibility/event hook: никакие места не открываются автоматически и не сканируется весь уровень.
+- `get_known_places` возвращает только сущности, у которых есть положительный `known_place` claim; статический каталог не превращается в знания персонажа. `get_companion_world_context` не смешивает текущий уровень Затон с remembered/known places.
+- Backend намеренно session-only, ограничен 512 claims и не сериализуется. Save compatibility старых A-Life squad save-пакетов не затрагивалась; persistence остаётся отдельной задачей до аудита формата STATE_Read/STATE_Write.
+- Статическая структура Lua будет проверена; игровой runtime новой API ещё не подтверждён.
