@@ -602,7 +602,22 @@ local function gpt_world_get_game_graph()
     return nil
 end
 
-local function gpt_world_get_companion_server_object(simulation)
+local function gpt_world_get_companion_server_object(simulation, requested_companion_id)
+    -- Callers that already hold the A-Life ID can avoid depending on the
+    -- Story ID registry having been refreshed at this exact update.
+    if requested_companion_id ~= nil then
+        if type(requested_companion_id) ~= "number" or requested_companion_id <= 0 then
+            return nil, "invalid_companion_id"
+        end
+
+        local requested_companion = gpt_world_safe_method(simulation, "object", requested_companion_id)
+        if requested_companion == nil then
+            return nil, "companion_object_unavailable"
+        end
+
+        return requested_companion, requested_companion_id
+    end
+
     if type(get_story_object_id) ~= "function" then
         return nil, "story_id_lookup_unavailable"
     end
@@ -716,13 +731,15 @@ end
 --   snapshot, nil
 -- Failure:
 --   nil, stable_error_code
-function gpt_world.get_companion_location_snapshot()
+-- Pass companion_alife_id when the caller already has a current A-Life
+-- object ID. With no argument, resolve the unique companion through Story ID.
+function gpt_world.get_companion_location_snapshot(companion_alife_id)
     local simulation = gpt_world_get_alife()
     if simulation == nil then
         return nil, "alife_unavailable"
     end
 
-    local companion, companion_id = gpt_world_get_companion_server_object(simulation)
+    local companion, companion_id = gpt_world_get_companion_server_object(simulation, companion_alife_id)
     if companion == nil then
         return nil, companion_id
     end
