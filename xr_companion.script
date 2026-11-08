@@ -108,7 +108,7 @@ function action_companion_activity:beh_walk_simple()
 			if dist_from_self_to_actor <= dist_walk then
 				new_state = "raid"
 				target = {look_object = get_story_object("actor")}
-			elseif dist_to_assist_pt <= dist_run then
+			elseif dist_from_self_to_actor <= dist_run then
 				new_state = "rush"
 			else
 				new_state = "assault"
