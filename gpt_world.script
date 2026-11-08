@@ -141,9 +141,9 @@ local function gpt_world_resolve_level(simulation, graph, game_vertex_id)
 end
 
 local function gpt_world_resolve_smart_terrain(simulation, server_companion, online_companion, level_name)
-    local smart_terrain_id = gpt_world_safe_index(server_companion, "m_smart_terrain_id")
+    local smart_terrain_id = gpt_world_safe_index(online_companion, "m_smart_terrain_id")
     if type(smart_terrain_id) ~= "number" then
-        smart_terrain_id = gpt_world_safe_index(online_companion, "m_smart_terrain_id")
+        smart_terrain_id = gpt_world_safe_index(server_companion, "m_smart_terrain_id")
     end
     if type(smart_terrain_id) ~= "number"
         or smart_terrain_id == GPT_WORLD_NO_SMART_TERRAIN_ID
