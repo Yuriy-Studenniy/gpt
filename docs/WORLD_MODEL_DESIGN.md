@@ -175,10 +175,10 @@ Smart Terrain не следует автоматически считать по
 - **get_catalog_levels()** / **get_catalog_entity(entity_id)** — read-only справочник уровней и сущностей;
 - **get_catalog_smart_terrains(level_entity_id)** — read-only справочник 53 Smart Terrain/A-Life адресов;
 - **get_companion_location_snapshot(companion_alife_id?)** — read-only источник объективного текущего местоположения; принимает известный A-Life ID или разрешает уникального спутника по Story ID;
-- **record_claim(claim)** — добавляет явное утверждение с provenance/confidence; текущий backend ограничен памятью Lua-сессии, лимит 512 claims;
+- **record_claim(claim)** — добавляет явное утверждение с provenance/confidence и необязательным `level_id` для POI без каталожной записи; текущий backend ограничен памятью Lua-сессии, лимит 512 claims;
 - **get_claims(subject_id, predicate)** — возвращает копии утверждений, не раскрывая внутреннюю таблицу;
 - **get_known_places(filters)** — возвращает только сущности с положительным `known_place` claim; каталог сам по себе не открывает места;
-- **record_observation(event)** — принимает только явно подтверждённое событие `place_observed` и создаёт claim со статусом `observed`;
+- **record_observation(event)** — принимает только явно подтверждённое событие `place_observed` (с `level_id`, если место ещё не внесено в каталог) и создаёт claim со статусом `observed`;
 - **get_companion_world_context(companion_alife_id?)** — возвращает раздельные поля `engine` (текущие факты X-Ray) и `knowledge` (только явные claims).
 
 У API должно быть явное разделение catalog и knowledge. Функция, возвращающая каталог, не должна использоваться LLM как перечень уже известных персонажу мест.
