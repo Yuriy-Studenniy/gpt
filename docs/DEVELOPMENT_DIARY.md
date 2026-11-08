@@ -695,3 +695,11 @@
 - Ожидаемые строки: `[GPT_WORLD] Module loaded; levels=5` или `[GPT_WORLD] Module load failed: ...`. Snapshot после успешной companion setup теперь имеет отдельную строку `[GPT_WORLD] Companion location snapshot; ...`.
 - Компаньон и его A-Life setup не менялись этим исправлением. Проверены обновлённый файл и call-site в GitHub; Lua-компиляция и runtime-проверка не выполнялись. Следующий игровой запуск нужен только для подтверждения вывода лога.
 - Кодовый коммит: `450142e73f7a3004c13c61c761c83bbcfa31f2ed`.
+
+
+### Надёжные retail console-маркеры для World Model probe — 2026-11-08
+
+- Следующий лог после установки независимого probe по-прежнему не содержал `[GPT_WORLD]`. Проверка показала, что `printf` не является надёжным каналом подтверждения в `xray_administrator.log`; ранее уже существующие диагностические команды через `get_console():execute()` видны в этом логе.
+- В `gpt_world_log_module_status()` добавлены явные маркеры: `gpt_companion_diag_world_module_probe_entered`, `gpt_companion_diag_world_module_loaded_levels_5` при успехе, `gpt_companion_diag_world_module_load_failed_...` при ошибке, либо `gpt_companion_diag_world_module_api_invalid_level_catalog` при неверном API-ответе. Ошибка вызова остаётся под `pcall` и не влияет на companion setup.
+- Ожидается, что все маркеры будут видны как строки `Unknown command: ...`, по аналогии с уже имеющимися companion diagnostics. Это следующий проверяемый тест; Lua-компиляция и запуск игры разработчиком не выполнялись.
+- Кодовый коммит: `891f532bad052383c0a1dc269098ce2de56f36cb`.
