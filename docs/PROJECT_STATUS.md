@@ -129,13 +129,16 @@
 
 Начата глава 2 — модель мира Зоны. Архитектура описана в [WORLD_MODEL_DESIGN.md](WORLD_MODEL_DESIGN.md): три слоя данных (каталог, факты движка, знания компаньона), устойчивые ID, provenance/confidence и требования к безопасному сохранению.
 
-Первый кодовый артефакт — корневой файл `gpt_world.script`. В нём появились:
-- статический каталог пяти engine level names, найденных в `sim_board.script`: `zaton`, `jupiter`, `pripyat`, `labx8`, `jupiter_underground`;
-- `gpt_world.get_catalog_entity()` и `gpt_world.get_catalog_levels()` — read-only чтение каталога;
-- `gpt_world.get_companion_location_snapshot()` — read-only адаптер, извлекающий текущий уровень и назначенный Smart Terrain уникального спутника из X-Ray A-Life/online object.
+Первый модуль — корневой файл `gpt_world.script`. Сейчас в нём есть:
+- статический каталог 5 engine level names из mapping `group_id_by_levels`: `zaton`, `jupiter`, `pripyat`, `labx8`, `jupiter_underground`;
+- каталог 53 Smart Terrain/A-Life назначения на четырёх уровнях: Затон — 25, Юпитер — 18, Припять — 9, Лаборатория X-8 — 1. Данные собраны из базовых start_position-секций `simulation.ltx` и Smart Terrain property-секций `simulation_objects_props.ltx`; тестовые и сторонние start-position блоки исключены;
+- `gpt_world.get_catalog_entity()`, `gpt_world.get_catalog_levels()`, `gpt_world.get_catalog_smart_terrains()` — read-only доступ к каталогу;
+- `gpt_world.get_companion_location_snapshot()` — read-only извлечение текущего уровня и назначенного Smart Terrain уникального спутника из X-Ray A-Life/online object.
 
-Каталог уровней основан на ключах `group_id_by_levels`, которые `sim_board.setup_squad_and_group()` выбирает по `level.name()`. Этот список отражает пять найденных ключей T/S/G mapping и пока не объявляется исчерпывающим перечнем всех возможных уровней. Числовые Game Graph ID адаптер получает у движка, а не угадывает.
+**Ленивую загрузку подключили.** `bind_stalker.script` после успешной настройки спутника один раз обращается к namespace `gpt_world`. По механизму X-Ray global namespace auto-load это должно загрузить `gpt_world.script` из `gamedata/scripts`. Snapshot выполняется внутри `pcall`, логирует `[GPT_WORLD] Module loaded` либо диагностическую причину недоступности и не влияет на успешность спавна. Сервис не регистрируется в `modules.script` как NPC-схема.
 
-**Ограничение текущего состояния:** `gpt_world.script` пока не подключён к загрузке скриптов, не вызывается binders и не включён в `INSTALLATION.md`. `modules.script` регистрирует NPC-схемы, для которых `xr_logic.activate_by_section()` ожидает `set_scheme()`; это не универсальный loader для доменных сервисов. Модуль пока не меняет поведение игры и не является доступной из игры функцией. Статическая сверка источников выполнена, но Lua-компиляция и runtime-тест не выполнялись.
+Установочная инструкция обновлена: `gamedata/scripts/gpt_world.script` — двенадцатый файл. В игре пока не проверено, что retail CoP 1.6.02 загружает модуль именно так и что snapshot возвращает ожидаемый уровень. Статическая проверка источников выполнена; Lua-компиляция и runtime-тест не выполнялись.
 
-Последние коммиты модуля: `a01fc252585a40991c57be93757abe4b698aa0f8`, `30900203760b40f6fa55bbcbc9c3550e0fe9cd60`, `a886751f75dca180a87097beb6864b24379759c5`, `6601176739956d0c41f4618d9f90939d4abba01f`. Следующий приоритет — проверить loader path и расширить статический каталог именованных мест/Smart Terrain, не превращая их наличие в знания компаньона.
+Последние коммиты кода: каталог `52c4fb00fc6e90150436f5bb99efcbe15531feaf`, lazy-load интеграция `cb72fb6923f11d2edd430245240eb9f704385b81`. Установочная инструкция `da04427a090f1a26e7b4e0282dd908cc09f5b587`, архитектура `d6a190fe9065809d974b7733ff7abe23864b481b`.
+
+Следующий приоритет: проверить установку/загрузку модуля по обычному игровому логу при следующем удобном запуске; затем добавить именованные метаданные для мест только из подтверждённых игровых источников. Каталог пока не превращается в слой известных компаньону мест: никакие записи автоматически не помечаются как увиденные или известные.
