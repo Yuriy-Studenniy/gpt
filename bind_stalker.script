@@ -546,7 +546,9 @@ gpt_companion_log_knowledge_api = function(companion_id, test_level_id)
 	if results.probe_passed == true then
 		gpt_world_snapshot_marker("knowledge_api_probe_passed")
 	else
-		gpt_world_snapshot_marker("knowledge_api_probe_failed", error_code or results.error or "assertion")
+		local failure_detail = results.error or error_code or "assertion"
+		gpt_world_snapshot_marker("knowledge_api_error", string.sub(tostring(failure_detail), 1, 56))
+		gpt_world_snapshot_marker("knowledge_api_probe_failed", error_code or "assertion")
 	end
 	return results.probe_passed == true
 end
