@@ -431,12 +431,12 @@ local function gpt_companion_log_world_snapshot(companion_id)
 
 	if not call_ok then
 		gpt_world_snapshot_marker("call_failed", string.sub(tostring(snapshot), 1, 72))
-		return
+		return nil, "call_failed"
 	end
 
 	if snapshot == nil then
 		gpt_world_snapshot_marker("unavailable", error_code or "unknown")
-		return
+		return nil, error_code or "unknown"
 	end
 
 	local level_name = snapshot.level and snapshot.level.name
@@ -455,7 +455,46 @@ local function gpt_companion_log_world_snapshot(companion_id)
 		gpt_world_snapshot_marker("smart_none")
 	end
 
+	if type(snapshot.smart_terrain_status) == "string" then
+		gpt_world_snapshot_marker("smart_status", snapshot.smart_terrain_status)
+	end
+	if type(snapshot.smart_terrain_alife_object_id) == "number" then
+		gpt_world_snapshot_marker("smart_id", tostring(snapshot.smart_terrain_alife_object_id))
+	end
+
 	gpt_world_snapshot_marker("read_ok")
+	return snapshot, nil
+end
+
+-- Retry briefly so the first sample is not limited to the frame in which the
+-- companion's A-Life object was created or recovered from the save.
+local function gpt_update_world_snapshot(binder, now)
+	local companion_id = binder.gpt_world_snapshot_companion_id
+	if companion_id == nil or binder.gpt_world_snapshot_done then
+		return
+	end
+	if binder.gpt_world_snapshot_retry_at ~= nil and now < binder.gpt_world_snapshot_retry_at then
+		return
+	end
+
+	binder.gpt_world_snapshot_attempts = (binder.gpt_world_snapshot_attempts or 0) + 1
+	local attempt = binder.gpt_world_snapshot_attempts
+	gpt_world_snapshot_marker("attempt", tostring(attempt))
+
+	local snapshot = gpt_companion_log_world_snapshot(companion_id)
+	if snapshot ~= nil and snapshot.is_online == true and snapshot.smart_terrain ~= nil then
+		binder.gpt_world_snapshot_done = true
+		gpt_world_snapshot_marker("polling_complete")
+		return
+	end
+
+	if attempt >= 5 then
+		binder.gpt_world_snapshot_done = true
+		gpt_world_snapshot_marker("polling_finished", tostring(attempt))
+		return
+	end
+
+	binder.gpt_world_snapshot_retry_at = now + 2000
 end
 
 local function gpt_update_companion_setup(binder)
@@ -464,11 +503,12 @@ local function gpt_update_companion_setup(binder)
 		gpt_companion_diagnostic("actor_binder setup updater entered")
 	end
 
+	local now = time_global()
+	gpt_update_world_snapshot(binder, now)
+
 	if binder.gpt_companion_setup_complete or binder.gpt_companion_setup_blocked then
 		return
 	end
-
-	local now = time_global()
 	if binder.gpt_companion_setup_retry_at ~= nil and now < binder.gpt_companion_setup_retry_at then
 		return
 	end
@@ -486,10 +526,13 @@ local function gpt_update_companion_setup(binder)
 	-- The A-Life ID is available even if squad registration needs a retry.
 	-- Keep factual location telemetry independent from A-Life squad success.
 	local snapshot_companion_id = companion_id or candidate_companion_id
-	if snapshot_companion_id ~= nil and not binder.gpt_world_snapshot_checked then
-		binder.gpt_world_snapshot_checked = true
-		gpt_companion_log_world_snapshot(snapshot_companion_id)
+	if snapshot_companion_id ~= nil and binder.gpt_world_snapshot_companion_id == nil then
+		binder.gpt_world_snapshot_companion_id = snapshot_companion_id
+		binder.gpt_world_snapshot_attempts = 0
+		binder.gpt_world_snapshot_retry_at = now + 1000
+		binder.gpt_world_snapshot_done = false
 	end
+	gpt_update_world_snapshot(binder, now)
 
 	if companion_id ~= nil then
 		binder.gpt_companion_setup_complete = true
@@ -541,7 +584,10 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_companion_setup_blocked = false
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
-	self.gpt_world_snapshot_checked = false
+	self.gpt_world_snapshot_companion_id = nil
+	self.gpt_world_snapshot_attempts = 0
+	self.gpt_world_snapshot_retry_at = nil
+	self.gpt_world_snapshot_done = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -573,7 +619,10 @@ function actor_binder:net_spawn(data)
 	self.gpt_companion_setup_blocked = false
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
-	self.gpt_world_snapshot_checked = false
+	self.gpt_world_snapshot_companion_id = nil
+	self.gpt_world_snapshot_attempts = 0
+	self.gpt_world_snapshot_retry_at = nil
+	self.gpt_world_snapshot_done = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
