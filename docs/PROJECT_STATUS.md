@@ -135,7 +135,7 @@
 - `gpt_world.get_catalog_entity()`, `gpt_world.get_catalog_levels()`, `gpt_world.get_catalog_smart_terrains()` — read-only доступ к каталогу;
 - `gpt_world.get_companion_location_snapshot()` — read-only извлечение текущего уровня и назначенного Smart Terrain уникального спутника из X-Ray A-Life/online object.
 
-**Ленивую загрузку подключили.** `bind_stalker.script` после успешной настройки спутника один раз обращается к namespace `gpt_world`. По механизму X-Ray global namespace auto-load это должно загрузить `gpt_world.script` из `gamedata/scripts`. Snapshot выполняется внутри `pcall`, логирует `[GPT_WORLD] Module loaded` либо диагностическую причину недоступности и не влияет на успешность спавна. Сервис не регистрируется в `modules.script` как NPC-схема.
+**Ленивую загрузку подключили и отделили проверку от настройки спутника.** `bind_stalker.script` независимо от A-Life spawn/squad setup один раз на actor binder обращается к `gpt_world.get_catalog_levels()` через `pcall`, инициируя X-Ray global namespace auto-load `gpt_world.script`. Успех даёт `[GPT_WORLD] Module loaded; levels=5`, ошибка — `[GPT_WORLD] Module load failed: ...`. После успешной настройки спутника отдельный вызов snapshot логирует `[GPT_WORLD] Companion location snapshot; ...`. Сервис не регистрируется в `modules.script` как NPC-схема.
 
 Установочная инструкция обновлена: `gamedata/scripts/gpt_world.script` — двенадцатый файл. В игре пока не проверено, что retail CoP 1.6.02 загружает модуль именно так и что snapshot возвращает ожидаемый уровень. Статическая проверка источников выполнена; Lua-компиляция и runtime-тест не выполнялись.
 
