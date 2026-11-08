@@ -14,6 +14,7 @@
 ## 1. Создание и идентичность NPC
 
 - [x] Спутник создан и появился в игровом мире (первичный spawn подтверждён пользователем); отсутствие дубликатов при повторной загрузке ещё не проверено.
+- [ ] При загрузке нет `cannot open config file scripts\\gpt_companion_custom.ltx`; после запуска схемы в логе появляется `[GPT_COMPANION_FOLLOW] activity action initialized`.
 - [ ] Компаньон появляется на доступной позиции, не внутри игрока, стены или опасной геометрии.
 - [ ] NPC зарегистрирован с уникальным Story ID gpt_companion_main, squad — gpt_companion_squad.
 - [ ] В логе есть `[GPT_COMPANION] Created unique companion` и `Setup complete`; нет повторяющегося `setup_exception`.
