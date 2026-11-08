@@ -8,6 +8,9 @@
 local squad_behaviour_ini 	= ini_file("misc\\squad_behaviours.ltx")
 local locations_ini			= ini_file("misc\\smart_terrain_masks.ltx")
 
+-- The companion needs API is defined by bind_stalker.script, which is loaded
+-- with the actor binder before online NPC updates can query it.
+
 --function printf()
 --end
 
