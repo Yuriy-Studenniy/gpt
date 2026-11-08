@@ -167,14 +167,14 @@ Smart Terrain не следует автоматически считать по
 
 Источник для статической сверки: [script_engine.cpp — X-Ray 1.6.02 engine source](https://github.com/VideogameSources/STALKER-Call-of-Pripyat/blob/xd_dev/src/xrScriptEngine/script_engine.cpp), функции **auto_load**, **setup_auto_load**, **process_file_if_exists**. Оригинальная retail-сборка CoP в этой среде не запускалась, поэтому окончательное подтверждение доступности механизма в целевом executable остаётся runtime-проверкой.
 
-В **bind_stalker.script** после успешной настройки уникального компаньона один раз вызывается **gpt_companion_log_world_snapshot()**. Внутри pcall первое обращение к глобальному **gpt_world** должно лениво загрузить **gpt_world.script**. Сервис читает один текущий snapshot и пишет строку **[GPT_WORLD] Module loaded**; при ошибке пишет диагностический статус, но не отменяет создание компаньона и не меняет поведение NPC.
+В **bind_stalker.script** World Model lazy-load probe выполняется независимо от A-Life spawn/squad setup. После появления A-Life ID компаньона вызывается **gpt_companion_log_world_snapshot(companion_id)** — даже если регистрация squad ещё требует повторной попытки. Snapshot API принимает необязательный числовой **companion_alife_id**: при передаче использует уже известный ID через **alife():object(id)**, без зависимости от своевременного обновления Story ID registry; без аргумента сохраняется lookup по **gpt_companion_main**. Полученные level name, online/offline и Smart Terrain (если назначен) выводятся отдельными retail-visible диагностическими маркерами. Ошибки snapshot защищены pcall и не должны отменять создание компаньона или менять поведение NPC.
 
 Файл добавлен в установочный список как **gamedata/scripts/gpt_world.script**. Он не зарегистрирован в **modules.script** и не является NPC-схемой. Сам snapshot — только объективный контекст движка; в систему знаний он автоматически не записывается.
 
 Публичный контракт будущего доменного API (имена предварительные):
 - **get_catalog_levels()** / **get_catalog_entity(entity_id)** — read-only справочник уровней и сущностей;
 - **get_catalog_smart_terrains(level_entity_id)** — read-only справочник 53 Smart Terrain/A-Life адресов;
-- **get_companion_location_snapshot()** — read-only источник объективного текущего местоположения;
+- **get_companion_location_snapshot(companion_alife_id?)** — read-only источник объективного текущего местоположения; принимает известный A-Life ID или разрешает уникального спутника по Story ID;
 - **record_claim(claim)** — будущая операция сохранения знания с источником и уверенностью;
 - **get_claims(entity_id, predicate)** — читает известные персонажу утверждения;
 - **get_known_places(filters)** — возвращает только места, на которые у персонажа есть знание;
