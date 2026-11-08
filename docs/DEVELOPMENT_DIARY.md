@@ -686,3 +686,12 @@
 
 
 - Финальная синхронизация WORLD_MODEL_DESIGN.md после сверки: убрано повторение ограничения по runtime/pcall и нормализована запись simulation_node ID. Коммит: 47dd7a3acdea74d89f27fff6494fbead9794828b.
+
+
+### Отделение проверки lazy loader от companion setup — 2026-11-08
+
+- По первому игровому логу после установки файлов компаньон был создан, но строка `[GPT_WORLD]` отсутствовала. Выяснилось, что первоначальная проверка lazy loader вызывалась только после успешного завершения A-Life squad setup; поэтому отсутствие строки не позволяло отдельно проверить загрузчик.
+- В `bind_stalker.script` добавлен независимый одноразовый probe из `actor_binder:update()`: чтение `gpt_world.get_catalog_levels()` под `pcall` инициирует lazy load независимо от spawn/squad результата.
+- Ожидаемые строки: `[GPT_WORLD] Module loaded; levels=5` или `[GPT_WORLD] Module load failed: ...`. Snapshot после успешной companion setup теперь имеет отдельную строку `[GPT_WORLD] Companion location snapshot; ...`.
+- Компаньон и его A-Life setup не менялись этим исправлением. Проверены обновлённый файл и call-site в GitHub; Lua-компиляция и runtime-проверка не выполнялись. Следующий игровой запуск нужен только для подтверждения вывода лога.
+- Кодовый коммит: `450142e73f7a3004c13c61c761c83bbcfa31f2ed`.
