@@ -680,3 +680,6 @@
 - Статически проверено: engine source loader path, _G namespace auto load, game scripts path, Lua module API, catalog source rows, install path, companion setup call-site. Lua compiler и retail CoP runtime не запускались.
 - Коммиты кода: Smart Terrain catalog 52c4fb00fc6e90150436f5bb99efcbe15531feaf; lazy-load integration cb72fb6923f11d2edd430245240eb9f704385b81.
 - Коммиты документации: install da04427a090f1a26e7b4e0282dd908cc09f5b587; architecture d6a190fe9065809d974b7733ff7abe23864b481b; status 87364a64bcf1715b12d8b0eea85e3cdfd948599b; checklist 1ceb205524901d9a06cdfb317381950f1d56cd1b; docs index 0e7d1d4ccc3dde331fcb2f38e3162521de86df99.
+
+
+- Дополнительно отполирован WORLD_MODEL_DESIGN.md: устранено дублирование ограничений адаптера и уточнена запись технических simulation_node ID. Коммит документации: 47dd7a3acdea74d89f27fff6494fbead9794828b.
