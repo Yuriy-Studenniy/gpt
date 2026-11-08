@@ -327,9 +327,9 @@ local function ensure_gpt_companion_spawned(actor)
 			printf("[GPT_COMPANION] Existing companion found: id=%s", tostring(existing_id))
 			local squad_id, setup_status = ensure_gpt_companion_squad(existing_id, actor)
 			if squad_id == nil then
-				return nil, setup_status
+				return nil, setup_status, existing_id
 			end
-			return existing_id, "ready"
+			return existing_id, "ready", existing_id
 		end
 		unregister_story_id(story_id)
 	end
@@ -357,10 +357,10 @@ local function ensure_gpt_companion_spawned(actor)
 	gpt_companion_diagnostic("Created unique companion id " .. tostring(companion.id))
 	local squad_id, setup_status = ensure_gpt_companion_squad(companion.id, actor)
 	if squad_id == nil then
-		return nil, setup_status
+		return nil, setup_status, companion.id
 	end
 
-	return companion.id, "ready"
+	return companion.id, "ready", companion.id
 end
 
 -- Probe the World Model independently from companion/squad setup.
@@ -395,30 +395,57 @@ local function gpt_world_log_module_status(binder)
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
 end
 
--- The snapshot is diagnostic engine context, not persistent companion knowledge.
+-- Snapshot markers use the console channel visible in retail xray_administrator.log.
+-- This diagnostic channel is separate from normal printf output.
+local function gpt_world_snapshot_marker(name, value)
+	local token = tostring(name)
+	if value ~= nil then
+		token = token .. "_" .. tostring(value)
+	end
+	token = string.sub(string.gsub(token, "[^%w_]", "_"), 1, 96)
+
+	pcall(function()
+		get_console():execute("gpt_companion_diag_world_snapshot_" .. token)
+	end)
+end
+
+-- The snapshot is objective engine context, not persistent companion knowledge.
+-- It is attempted as soon as the companion A-Life ID exists, even if squad setup
+-- is still pending or failed.
 local function gpt_companion_log_world_snapshot(companion_id)
-    local call_ok, snapshot, error_code = pcall(function()
-        return gpt_world.get_companion_location_snapshot()
-    end)
+	gpt_world_snapshot_marker("probe_entered")
 
-    if not call_ok then
-        printf("[GPT_WORLD] Lazy load/snapshot failed: %s", tostring(snapshot))
-        return
-    end
+	local call_ok, snapshot, error_code = pcall(function()
+		return gpt_world.get_companion_location_snapshot(companion_id)
+	end)
 
-    if snapshot == nil then
-        printf("[GPT_WORLD] Initial location snapshot unavailable: %s", tostring(error_code))
-        return
-    end
+	if not call_ok then
+		gpt_world_snapshot_marker("call_failed", string.sub(tostring(snapshot), 1, 72))
+		return
+	end
 
-    local level_id = snapshot.level and snapshot.level.entity_id or "unknown"
-    local smart_id = snapshot.smart_terrain and snapshot.smart_terrain.entity_id or "none"
-    printf("[GPT_WORLD] Companion location snapshot; companion=%s level=%s smart=%s online=%s",
-        tostring(companion_id),
-        tostring(level_id),
-        tostring(smart_id),
-        tostring(snapshot.is_online)
-    )
+	if snapshot == nil then
+		gpt_world_snapshot_marker("unavailable", error_code or "unknown")
+		return
+	end
+
+	local level_name = snapshot.level and snapshot.level.name
+	if type(level_name) == "string" and level_name ~= "" then
+		gpt_world_snapshot_marker("level", level_name)
+	else
+		gpt_world_snapshot_marker("level_unavailable")
+	end
+
+	gpt_world_snapshot_marker("online", tostring(snapshot.is_online))
+
+	local smart_name = snapshot.smart_terrain and snapshot.smart_terrain.name
+	if type(smart_name) == "string" and smart_name ~= "" then
+		gpt_world_snapshot_marker("smart", smart_name)
+	else
+		gpt_world_snapshot_marker("smart_none")
+	end
+
+	gpt_world_snapshot_marker("read_ok")
 end
 
 local function gpt_update_companion_setup(binder)
@@ -437,11 +464,21 @@ local function gpt_update_companion_setup(binder)
 	end
 
 	binder.gpt_companion_setup_attempts = (binder.gpt_companion_setup_attempts or 0) + 1
-	local call_ok, companion_id, setup_status = pcall(ensure_gpt_companion_spawned, binder.object)
+	local call_ok, companion_id, setup_status, candidate_companion_id =
+		pcall(ensure_gpt_companion_spawned, binder.object)
 	if not call_ok then
 		setup_status = "setup_exception: " .. tostring(companion_id)
 		gpt_companion_diagnostic("Setup exception " .. tostring(companion_id))
 		companion_id = nil
+		candidate_companion_id = nil
+	end
+
+	-- The A-Life ID is available even if squad registration needs a retry.
+	-- Keep factual location telemetry independent from A-Life squad success.
+	local snapshot_companion_id = companion_id or candidate_companion_id
+	if snapshot_companion_id ~= nil and not binder.gpt_world_snapshot_checked then
+		binder.gpt_world_snapshot_checked = true
+		gpt_companion_log_world_snapshot(snapshot_companion_id)
 	end
 
 	if companion_id ~= nil then
@@ -449,7 +486,6 @@ local function gpt_update_companion_setup(binder)
 		binder.gpt_companion_setup_retry_at = nil
 		printf("[GPT_COMPANION] Setup complete: companion=%s", tostring(companion_id))
 		gpt_companion_diagnostic("Setup complete companion " .. tostring(companion_id))
-		gpt_companion_log_world_snapshot(companion_id)
 		return
 	end
 
@@ -495,6 +531,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_companion_setup_blocked = false
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
+	self.gpt_world_snapshot_checked = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -526,6 +563,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_companion_setup_blocked = false
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
+	self.gpt_world_snapshot_checked = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
