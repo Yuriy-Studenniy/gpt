@@ -405,15 +405,19 @@ local function gpt_world_log_module_status(binder)
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
 end
 
--- Use the ordinary game log for World Model diagnostics. Executing synthetic
--- console commands here can interrupt the actor update path on some X-Ray builds.
+-- Retail X-Ray's reliable diagnostic channel in this project is a harmless
+-- synthetic console command: the engine logs "Unknown command" with the marker.
+-- Do not replace this with printf; it is not visible in the target retail setup.
 local function gpt_world_snapshot_marker(name, value)
 	local token = tostring(name)
 	if value ~= nil then
 		token = token .. "_" .. tostring(value)
 	end
 	token = string.sub(string.gsub(token, "[^%w_]", "_"), 1, 96)
-	printf("[GPT_WORLD_SNAPSHOT] %s", token)
+
+	pcall(function()
+		get_console():execute("gpt_companion_diag_world_snapshot_" .. token)
+	end)
 end
 
 -- The snapshot is objective engine context, not persistent companion knowledge.
