@@ -661,3 +661,22 @@
 - Последняя правка кода добавляет только статический каталог и функции чтения; игровые файлы загрузки/биндеры и логика NPC не менялись.
 - Коммит каталога: 6601176739956d0c41f4618d9f90939d4abba01f. Обновления архитектуры и статуса: 336d25da13673bced17d6cf09c3e38d6b18085f5 и 1356d884788ec4a62d23252059253a1f529fd0c7.
 - Проверка: исходники _g.script, modules.script, xr_logic.script, sim_board.script, smart_terrain.script, db.script и lua_help.script прочитаны по нужным API и control flow. Lua/luac/luajit отсутствуют в доступном окружении; Lua-компиляция и CoP runtime не выполнялись.
+
+
+### Расширение каталога Smart Terrain и подключение lazy-load — 2026-11-08
+
+- Из базовых start_position в simulation.ltx и explicit property sections в simulation_objects_props.ltx сформирован статический каталог из 53 A-Life назначений:
+  - Zaton: 25;
+  - Jupiter: 18;
+  - Pripyat: 9;
+  - Lab X-8: 1.
+- В каталог попадают только правые части базовых start_position_<map> записей и подвариантов, где комментарий simulation.ltx определяет значение как smart name для squad, плюс именные map-prefixed Smart Terrain sections из simulation_objects_props.ltx. Исключены tgm_bug_test, lain_selo, corr_* и другие пользовательские/тестовые start-position blocks, комментарии и pas_b400 waypoint entries.
+- Технические узлы *_sim_N помечаются как simulation_node; остальные — как smart_terrain. Никакая запись каталога сама по себе не считается известной компаньону. Локализованные описания не выдумывались.
+- В gpt_world.script добавлена GPT_WORLD_SMART_TERRAIN_CATALOG, функция get_catalog_smart_terrains(level_entity_id) и поиск Smart Terrain в get_catalog_entity(). Геттеры возвращают копии записей и отсортированные массивы, чтобы внешний код не мог менять исходную таблицу.
+- Проверен движковый script loader на открытом X-Ray 1.6.02-based source: CScriptEngine::setup_auto_load() ставит __index metatable на _G; CScriptEngine::auto_load() загружает имя namespace через process_file_if_exists(); сам loader ищет name.script в $game_scripts$. Ссылка: https://github.com/VideogameSources/STALKER-Call-of-Pripyat/blob/xd_dev/src/xrScriptEngine/script_engine.cpp. Это подтверждает архитектурный путь на уровне engine source, но не заменяет тест оригинального retail executable.
+- Через modules.script сервис не регистрируется: load_scheme предназначен для NPC-схем, а xr_logic ожидает метод set_scheme(). Вместо этого bind_stalker.script после успешной настройки спутника один раз обращается к gpt_world.get_companion_location_snapshot() через pcall. Это инициирует lazy load; логирует [GPT_WORLD] Module loaded и current level/smart IDs либо диагностическую ошибку. Ошибка адаптера не отменяет spawn setup.
+- gpt_world.script добавлен в INSTALLATION.md как gamedata/scripts/gpt_world.script; теперь список содержит 12 файлов. modules.script копировать не требуется.
+- Добавлен отдельный unchecked пункт в IN_GAME_TEST_CHECKLIST.md для проверки lazy-load snapshot при следующем удобном игровом запуске. Пользователю не требуется ради этого менять маршрут или отдельно проходить локации.
+- Статически проверено: engine source loader path, _G namespace auto load, game scripts path, Lua module API, catalog source rows, install path, companion setup call-site. Lua compiler и retail CoP runtime не запускались.
+- Коммиты кода: Smart Terrain catalog 52c4fb00fc6e90150436f5bb99efcbe15531feaf; lazy-load integration cb72fb6923f11d2edd430245240eb9f704385b81.
+- Коммиты документации: install da04427a090f1a26e7b4e0282dd908cc09f5b587; architecture d6a190fe9065809d974b7733ff7abe23864b481b; status 87364a64bcf1715b12d8b0eea85e3cdfd948599b; checklist 1ceb205524901d9a06cdfb317381950f1d56cd1b; docs index 0e7d1d4ccc3dde331fcb2f38e3162521de86df99.
