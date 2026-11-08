@@ -539,3 +539,12 @@
 - Commits: `e948278978f978317b443aa1c8e99e65cd722b56` (первоначальные маркеры), `c63af20bec6f01aec7853b634448f87055d93d69` и `7ce91bea46fbf61faafe3b8d0e84255470d20941` (console diagnostics).
 - Следующий лог должен показать фактическую точку выполнения; игровой spawn всё ещё не подтверждён.
 
+
+
+### Локализация отсутствия spawn point по игровому логу — 2026-11-08
+
+- Новый xray_administrator.log наконец дал последовательность диагностических маркеров: updater entered → Spawn routine entered → Companion Story ID lookup nil → No safe nearby spawn vertex found. Это подтверждает, что скрипт загружен и actor update работает; Story ID свободен, отказ происходит на поиске точки появления.
+- В `gpt_companion_spawn_point(actor)` каждый кандидат дополнительно проверялся через `actor:accessible(candidate)`. Но `actor` — игрок, а X-Ray API документирует `accessible(vertex_id)` только для `CCustomMonster` и наследников; для других объектов метод не поддерживается.
+- Удалён этот неподходящий вызов. Теперь используется результат `level.vertex_in_direction`, и проверяется только, что движок вернул вершину, отличную от текущей. Согласно API IXR_level, при отсутствии валидной вершины функция возвращает исходную.
+- Commit: `3f41bb6127c3a8602ab574cb1b05abcf1a22ebfe`.
+- Статическая проверка обновлённого блока выполнена. CoP runtime не запускался; следующий шаг — заменить только `bind_stalker.script` и проверить, появились ли маркеры safe spawn / created companion / setup complete.
