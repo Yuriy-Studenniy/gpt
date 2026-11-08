@@ -40,7 +40,8 @@ Call of Pripyat/
    └─ configs/
       ├─ creatures/
       ├─ gameplay/
-      └─ misc/
+      ├─ misc/
+      └─ scripts/
 ```
 
 ## 4. Скопируй файлы проекта
@@ -55,7 +56,6 @@ Call of Pripyat/
 - [sim_squad_scripted.script](../sim_squad_scripted.script) → `gamedata/scripts/sim_squad_scripted.script`
 - [xr_corpse_detection.script](../xr_corpse_detection.script) → `gamedata/scripts/xr_corpse_detection.script`
 - [xr_motivator.script](../xr_motivator.script) → `gamedata/scripts/xr_motivator.script`
-- [gpt_companion_custom.ltx](../gpt_companion_custom.ltx) → `gamedata/scripts/gpt_companion_custom.ltx`
 
 ### В `gamedata/configs/creatures/`
 
@@ -64,6 +64,10 @@ Call of Pripyat/
 ### В `gamedata/configs/misc/`
 
 - [squad_descr.ltx](../squad_descr.ltx) → `gamedata/configs/misc/squad_descr.ltx`
+
+### В `gamedata/configs/scripts/`
+
+- [gpt_companion_custom.ltx](../gpt_companion_custom.ltx) → `gamedata/configs/scripts/gpt_companion_custom.ltx`
 
 ### В `gamedata/configs/gameplay/`
 
@@ -98,8 +102,9 @@ Call of Pripyat/
 1. Убедись, что все пути и имена файлов совпадают с инструкцией.
 2. Запусти CoP 1.6.02 и загрузи копию сохранения (или начни тестовую новую игру).
 3. После загрузки дай игре несколько секунд на инициализацию. В `bind_stalker.script` настройка спутника вызывается из обновления игрока.
-4. Проверь лог игры. Ищи сообщения с префиксом `[GPT_COMPANION]`, например создание NPC, регистрацию squad или ошибку настройки.
-5. Не проверяй остальные функции по отдельности — используй единый [игровой чек-лист](IN_GAME_TEST_CHECKLIST.md) для одного полного прогона.
+4. Проверь, что в логе нет `cannot open config file scripts\\gpt_companion_custom.ltx`: этот файл должен лежать в `gamedata/configs/scripts/`, поскольку путь из `custom_data` разрешается относительно `configs/`.
+5. Ищи сообщения с префиксом `[GPT_COMPANION]` о создании NPC и настройке squad. После запуска follow action должны появиться диагностические сообщения `[GPT_COMPANION_FOLLOW]`.
+6. Не проверяй остальные функции по отдельности — используй единый [игровой чек-лист](IN_GAME_TEST_CHECKLIST.md) для одного полного прогона.
 
 Успешное появление NPC ещё не означает, что все функции главы 1 работают: online/offline, save/load, corpse reservations и поведение обычных NPC должны быть проверены по чек-листу.
 
