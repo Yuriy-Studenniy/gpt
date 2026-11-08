@@ -51,6 +51,7 @@ Call of Pripyat/
 ### В `gamedata/scripts/`
 
 - [bind_stalker.script](../bind_stalker.script) → `gamedata/scripts/bind_stalker.script`
+- [gpt_world.script](../gpt_world.script) → `gamedata/scripts/gpt_world.script`
 - [release_body_manager.script](../release_body_manager.script) → `gamedata/scripts/release_body_manager.script`
 - [sim_board.script](../sim_board.script) → `gamedata/scripts/sim_board.script`
 - [sim_squad_scripted.script](../sim_squad_scripted.script) → `gamedata/scripts/sim_squad_scripted.script`
@@ -74,7 +75,7 @@ Call of Pripyat/
 - [npc_profile.xml](../npc_profile.xml) → `gamedata/configs/gameplay/npc_profile.xml`
 - [character_desc_general.xml](../character_desc_general.xml) → `gamedata/configs/gameplay/character_desc_general.xml`
 
-Итого: **11 файлов**.
+Итого: **12 файлов**.
 
 ## 5. Важное предупреждение о конфигурациях
 
@@ -104,7 +105,8 @@ Call of Pripyat/
 3. После загрузки дай игре несколько секунд на инициализацию. В `bind_stalker.script` настройка спутника вызывается из обновления игрока.
 4. Проверь, что в логе нет `cannot open config file scripts\\gpt_companion_custom.ltx`: этот файл должен лежать в `gamedata/configs/scripts/`, поскольку путь из `custom_data` разрешается относительно `configs/`.
 5. Ищи сообщения с префиксом `[GPT_COMPANION]` о создании NPC и настройке squad. После запуска follow action должны появиться диагностические сообщения `[GPT_COMPANION_FOLLOW]`.
-6. Не проверяй остальные функции по отдельности — используй единый [игровой чек-лист](IN_GAME_TEST_CHECKLIST.md) для одного полного прогона.
+6. После успешной настройки компаньона модуль `gpt_world.script` должен лениво загрузиться по первому обращению из `bind_stalker.script`; ищи `[GPT_WORLD] Module loaded` с текущим level ID. Отсутствие Smart Terrain само по себе допустимо, если спутник ещё не назначен в smart.
+7. Не проверяй остальные функции по отдельности — используй единый [игровой чек-лист](IN_GAME_TEST_CHECKLIST.md) для одного полного прогона.
 
 Успешное появление NPC ещё не означает, что все функции главы 1 работают: online/offline, save/load, corpse reservations и поведение обычных NPC должны быть проверены по чек-листу.
 
