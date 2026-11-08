@@ -8,6 +8,8 @@ end
 
 -- GPT AI Companion: needs are stored on the always-present actor so they
 -- survive the companion switching between online and offline A-Life states.
+-- Keep this shared API in the actor bootstrap: NPC motivator and corpse-loot
+-- callbacks can run before the scripted A-Life squad class is first loaded.
 local GPT_HUNGER_PER_GAME_MINUTE = 0.18
 local GPT_THIRST_PER_GAME_MINUTE = 0.30
 
