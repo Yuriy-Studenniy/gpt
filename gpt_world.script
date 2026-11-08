@@ -1071,6 +1071,11 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
     GPT_WORLD_NEXT_CLAIM_ID = 1
 
     local run_ok, run_error = pcall(function()
+        local initially_known_places = gpt_world.get_known_places()
+        if type(initially_known_places) ~= "table" or #initially_known_places ~= 0 then
+            error("catalog_entries_leaked_into_knowledge")
+        end
+
         local claim, claim_error = gpt_world.record_claim({
             subject_id = "poi:gpt_world_self_test:claim",
             level_id = test_level_id,
@@ -1158,6 +1163,13 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         if rejected ~= nil or reject_error ~= "observation_not_confirmed" then
             error("unconfirmed_observation_was_not_rejected")
         end
+        local unconfirmed_claims = gpt_world.get_claims(
+            "poi:gpt_world_self_test:unconfirmed",
+            "known_place"
+        )
+        if #unconfirmed_claims ~= 0 then
+            error("unconfirmed_observation_created_claim")
+        end
         result.unconfirmed_observation_rejected_ok = true
 
         local context, context_error =
@@ -1166,6 +1178,9 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
             or type(context.engine.level) ~= "table"
             or type(context.engine.level.entity_id) ~= "string" then
             error("world_context_unavailable:" .. tostring(context_error))
+        end
+        if context.engine.level.entity_id ~= test_level_id then
+            error("world_context_level_mismatch")
         end
         if context.engine.is_online ~= true then
             error("world_context_companion_not_online")
