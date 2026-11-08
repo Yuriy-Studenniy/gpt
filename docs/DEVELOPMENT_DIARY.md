@@ -528,3 +528,12 @@
 - В обоих местах поиска существующего NPC/squad заменено на `get_story_object_id`, очистка stale IDs переведена на `unregister_story_id`. Commit `eca2cd6d37d0414b0662e30387d268d6ed7182e4`.
 - По `lua_help.script` дополнительно подтверждено наличие `level.vertex_in_direction(number, vector, number)` и `actor:accessible(number)` для подбора безопасной точки.
 - Правка устраняет конкретное препятствие до spawn point. Не заявлять, что companion уже появился: необходим следующий игровой запуск и подтверждение лога `[GPT_COMPANION] Created unique companion` / `Setup complete`.
+
+
+### Диагностические сообщения для отсутствующего companion — 2026-11-08
+
+- Получен лог xray_administrator.log: фатальной ошибки нет; загружено сохранение testi.scop; сообщений [GPT_COMPANION] нет. Скриптовые printf не отражаются в этом логе, поэтому для следующего теста использован engine log(string).
+- Наличие log(string) проверено в lua_help.script.
+- В bind_stalker.script теперь логируются вход actor updater, вход spawn routine, оба Story ID lookup, поиск безопасной spawn vertex, создание NPC, setup complete и всякая ошибка/повтор.
+- Коммит e948278978f978317b443aa1c8e99e65cd722b56. Это диагностическая правка, а не доказательство исправленного spawn. Следующий лог обязателен до дальнейшего изменения spawn logic.
+
