@@ -1044,7 +1044,7 @@ end
 -- Runs the public knowledge API against an isolated temporary claim table.
 -- The caller's in-session claims and claim ID sequence are restored even if
 -- an assertion or the live engine context read fails.
-function gpt_world.run_knowledge_api_self_test(companion_alife_id)
+function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id_override)
     local result = {
         claim_write_ok = false,
         claim_read_ok = false,
@@ -1052,18 +1052,29 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         observation_ok = false,
         unconfirmed_observation_rejected_ok = false,
         context_ok = false,
+        context_skipped = false,
         probe_passed = false
     }
 
-    local initial_snapshot, initial_snapshot_error =
-        gpt_world.get_companion_location_snapshot(companion_alife_id)
-    if type(initial_snapshot) ~= "table"
-        or type(initial_snapshot.level) ~= "table"
-        or type(initial_snapshot.level.entity_id) ~= "string" then
-        result.error = "engine_snapshot_unavailable:" .. tostring(initial_snapshot_error)
-        return result, "self_test_engine_snapshot_unavailable"
+    local test_level_id = nil
+    if gpt_world_is_nonempty_string(test_level_id_override) then
+        -- Core storage tests can run as soon as the module loads; they do not
+        -- depend on a live companion or the A-Life snapshot path.
+        test_level_id = test_level_id_override
+    elseif companion_alife_id ~= nil then
+        local initial_snapshot, initial_snapshot_error =
+            gpt_world.get_companion_location_snapshot(companion_alife_id)
+        if type(initial_snapshot) ~= "table"
+            or type(initial_snapshot.level) ~= "table"
+            or type(initial_snapshot.level.entity_id) ~= "string" then
+            result.error = "engine_snapshot_unavailable:" .. tostring(initial_snapshot_error)
+            return result, "self_test_engine_snapshot_unavailable"
+        end
+        test_level_id = initial_snapshot.level.entity_id
+    else
+        result.error = "test_level_id_required_without_companion"
+        return result, "self_test_missing_test_level"
     end
-    local test_level_id = initial_snapshot.level.entity_id
 
     local previous_claims = GPT_WORLD_CLAIMS
     local previous_next_claim_id = GPT_WORLD_NEXT_CLAIM_ID
@@ -1172,29 +1183,35 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         end
         result.unconfirmed_observation_rejected_ok = true
 
-        local context, context_error =
-            gpt_world.get_companion_world_context(companion_alife_id)
-        if type(context) ~= "table" or type(context.engine) ~= "table"
-            or type(context.engine.level) ~= "table"
-            or type(context.engine.level.entity_id) ~= "string" then
-            error("world_context_unavailable:" .. tostring(context_error))
+        if companion_alife_id ~= nil then
+            local context, context_error =
+                gpt_world.get_companion_world_context(companion_alife_id)
+            if type(context) ~= "table" or type(context.engine) ~= "table"
+                or type(context.engine.level) ~= "table"
+                or type(context.engine.level.entity_id) ~= "string" then
+                error("world_context_unavailable:" .. tostring(context_error))
+            end
+            if context.engine.level.entity_id ~= test_level_id then
+                error("world_context_level_mismatch")
+            end
+            if context.engine.is_online ~= true then
+                error("world_context_companion_not_online")
+            end
+            if type(context.knowledge) ~= "table"
+                or context.knowledge.persistence ~= "session_only"
+                or type(context.knowledge.known_places) ~= "table"
+                or #context.knowledge.known_places ~= 2 then
+                error("world_context_knowledge_mismatch")
+            end
+            result.context_level_entity_id = context.engine.level.entity_id
+            result.context_is_online = context.engine.is_online == true
+            result.context_ok = true
+        else
+            -- The engine-backed context is checked separately after a real
+            -- companion online snapshot becomes available.
+            result.context_skipped = true
         end
-        if context.engine.level.entity_id ~= test_level_id then
-            error("world_context_level_mismatch")
-        end
-        if context.engine.is_online ~= true then
-            error("world_context_companion_not_online")
-        end
-        if type(context.knowledge) ~= "table"
-            or context.knowledge.persistence ~= "session_only"
-            or type(context.knowledge.known_places) ~= "table"
-            or #context.knowledge.known_places ~= 2 then
-            error("world_context_knowledge_mismatch")
-        end
-        result.context_level_entity_id = context.engine.level.entity_id
         result.test_level_entity_id = test_level_id
-        result.context_is_online = context.engine.is_online == true
-        result.context_ok = true
     end)
 
     -- Always restore caller data and IDs; self-test leaves no test claims.
@@ -1211,7 +1228,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id)
         and result.known_places_ok
         and result.observation_ok
         and result.unconfirmed_observation_rejected_ok
-        and result.context_ok
+        and (result.context_ok or result.context_skipped)
 
     if not result.probe_passed then
         return result, "self_test_assertion_failed"
