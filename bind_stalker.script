@@ -532,10 +532,21 @@ local function gpt_update_world_snapshot(binder, now)
 	gpt_world_snapshot_marker("attempt", tostring(attempt))
 
 	local snapshot = gpt_companion_log_world_snapshot(companion_id)
-	if snapshot ~= nil and snapshot.is_online == true then
+	gpt_world_snapshot_marker("snapshot_returned", tostring(snapshot ~= nil))
+
+	local online_confirmed = snapshot ~= nil and snapshot.is_online == true
+	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
+	if online_confirmed then
 		if not binder.gpt_world_knowledge_api_checked then
+			gpt_world_snapshot_marker("knowledge_api_dispatch")
 			binder.gpt_world_knowledge_api_checked = true
-			gpt_companion_log_knowledge_api(companion_id)
+			local probe_ok, probe_error = pcall(gpt_companion_log_knowledge_api, companion_id)
+			if not probe_ok then
+				gpt_world_snapshot_marker("knowledge_api_dispatch_failed",
+					string.sub(tostring(probe_error), 1, 48))
+			else
+				gpt_world_snapshot_marker("knowledge_api_dispatch_returned")
+			end
 		end
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
