@@ -848,6 +848,9 @@ function gpt_world.record_claim(claim)
     if type(claim.source_type) ~= "string" or claim.source_type == "" then
         return nil, "invalid_source_type"
     end
+    if claim.level_id ~= nil and not gpt_world_is_nonempty_string(claim.level_id) then
+        return nil, "invalid_claim_level_id"
+    end
     if type(claim.source_id) ~= "nil"
         and type(claim.source_id) ~= "string"
         and type(claim.source_id) ~= "number" then
@@ -871,6 +874,7 @@ function gpt_world.record_claim(claim)
     local stored = {
         claim_id = "claim:" .. tostring(GPT_WORLD_NEXT_CLAIM_ID),
         subject_id = claim.subject_id,
+        level_id = claim.level_id,
         predicate = claim.predicate,
         value = claim.value,
         status = claim.status,
@@ -930,8 +934,8 @@ function gpt_world.get_known_places(filters)
                     include_place = true
                 else
                     local catalog_record = gpt_world.get_catalog_entity(place_id)
-                    include_place = catalog_record ~= nil
-                        and catalog_record.level_id == level_filter
+                    include_place = claim.level_id == level_filter
+                        or (catalog_record ~= nil and catalog_record.level_id == level_filter)
                 end
             end
 
@@ -983,6 +987,9 @@ function gpt_world.record_observation(event)
     if not gpt_world_is_nonempty_string(event.entity_id) then
         return nil, "invalid_observed_entity_id"
     end
+    if event.level_id ~= nil and not gpt_world_is_nonempty_string(event.level_id) then
+        return nil, "invalid_observation_level_id"
+    end
     if type(event.source_id) ~= "string" and type(event.source_id) ~= "number" then
         return nil, "invalid_observation_source_id"
     end
@@ -997,6 +1004,7 @@ function gpt_world.record_observation(event)
 
     return gpt_world.record_claim({
         subject_id = event.entity_id,
+        level_id = event.level_id,
         predicate = "known_place",
         value = true,
         status = "observed",
