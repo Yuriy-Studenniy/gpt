@@ -750,3 +750,12 @@
 - `get_known_places` возвращает только сущности, у которых есть положительный `known_place` claim; статический каталог не превращается в знания персонажа. `get_companion_world_context` не смешивает текущий уровень Затон с remembered/known places.
 - Backend намеренно session-only, ограничен 512 claims и не сериализуется. Save compatibility старых A-Life squad save-пакетов не затрагивалась; persistence остаётся отдельной задачей до аудита формата STATE_Read/STATE_Write.
 - Статическая структура Lua будет проверена; игровой runtime новой API ещё не подтверждён.
+
+
+## 2026-11-08 — Изолированная runtime self-test для World Model API
+
+- Добавлена `gpt_world.run_knowledge_api_self_test(companion_alife_id)`. Она выполняет временный цикл `record_claim` → `get_claims` → `get_known_places`, включая проверку defensive copy и level filter; затем `record_observation` для подтверждённого события и отказ для `confirmed=false`; в конце проверяет реальный `get_companion_world_context()`/online snapshot.
+- Тестовые claims изолируются заменой внутренней таблицы на временную и обязательно восстанавливают исходную таблицу и sequence ID после завершения, в том числе при ошибке через `pcall`. Никакие данные не добавляются в постоянное или пользовательское хранилище.
+- `bind_stalker.script` запускает self-test один раз после подтверждения companion `online_true`, независимо от дальнейшего хода игры. Retail-visible markers перечислены в `IN_GAME_TEST_CHECKLIST.md`; все markers используют уже проверенный `get_console():execute()` канал.
+- Тест использует фактический level entity ID из snapshot, поэтому не привязан к Затону. Синхронный переход локации во время самого короткого теста маловероятен, но runtime-проверка должна подтвердить поведение в оригинальном CoP.
+- Статическая проверка после добавления self-test пройдёт отдельно; результат в игре пока не подтверждён.
