@@ -712,3 +712,13 @@
 - Последующие маркеры показывают вход в companion setup, поиск безопасной точки и создание NPC с ID 12041. `Squad_Story_ID_lookup_nil` означает, что ранее зарегистрированный squad по этому Story ID не найден; сам по себе этот результат не является ошибкой и предшествует ветке создания нового squad. По присланному набору маркеров нельзя отдельно подтвердить завершение регистрации squad.
 - Строки `Unknown command: gpt_companion_diag_...` — ожидаемое отображение диагностических маркеров, отправленных через игровую консоль; они не означают отказ lazy loader. Последующим коммитом `43309c34eea296b7b6aa5f2815654d8deb8da105` диагностический helper очищен от синтетических console-команд; это устраняет шум в логе и не меняет функциональный код World Model.
 - Проверка snapshot уровня/Smart Terrain остаётся отдельным пунктом: вызов snapshot привязан к успешному завершению companion A-Life setup. Полный regression-прогон главы 1 не объявляется завершённым.
+
+
+### Snapshot положения спутника по известному A-Life ID — 2026-11-08
+
+- Расширен контракт `gpt_world.get_companion_location_snapshot(companion_alife_id?)`: если caller уже знает A-Life ID, модуль запрашивает объект напрямую через `alife():object(id)`; вызов без аргумента по-прежнему разрешает уникального спутника по Story ID.
+- `ensure_gpt_companion_spawned()` теперь возвращает ID уже созданного/найденного спутника третьим значением даже при неуспешной регистрации squad. Вызовы `ensure_gpt_companion_squad()` дополнительно защищены `pcall`, чтобы исключение настройки squad не теряло известный A-Life ID.
+- `gpt_update_companion_setup()` делает одноразовую попытку snapshot сразу после получения ID, не дожидаясь успешного A-Life squad setup. Это нужно для изолированной диагностики местоположения; статус squad при этом остаётся отдельным.
+- Snapshot выдаёт отдельные retail-visible console markers: `world_snapshot_probe_entered`, `world_snapshot_level_<name>`, `world_snapshot_online_<bool>`, `world_snapshot_smart_<name>` или `world_snapshot_smart_none`, затем `world_snapshot_read_ok`; ошибки выводятся как `world_snapshot_unavailable_<code>` или `world_snapshot_call_failed_<text>`. Ожидаемое отображение в логе начинается с `Unknown command:`; сами маркеры не меняют игровые данные.
+- Статическая проверка обновлённых Lua файлов: баланс блоков function/if/for/while/do/repeat/end/until и скобок не является компиляцией; синтаксис и реальные поля ещё должны подтвердиться в оригинальном CoP runtime. Результат snapshot в игре пока не проверен.
+- Коммиты: `gpt_world.script` `142450e0b8f14f9f032f0f26a6cfd1154552c0d1`; `bind_stalker.script` snapshot `3e64cd9452342f5ae38e8e8b828fdba99909760b`, затем сохранение ID при squad exception `89333771d21bf9d79829514e37e492d204d39a22`.
