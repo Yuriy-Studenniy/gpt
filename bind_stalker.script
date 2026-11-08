@@ -375,6 +375,9 @@ end
 
 -- Probe the World Model independently from companion/squad setup.
 -- Reading the global invokes X-Ray's namespace lazy loader for gpt_world.script.
+-- Forward declaration lets module-load verification run before companion spawn.
+local gpt_companion_log_knowledge_api
+
 local function gpt_world_log_module_status(binder)
 	if binder.gpt_world_module_checked then
 		return
@@ -403,6 +406,25 @@ local function gpt_world_log_module_status(binder)
 
 	gpt_companion_diagnostic("world_module_loaded_levels_" .. tostring(#levels))
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
+
+	-- Test the claim/observation store now, without waiting for an online NPC.
+	-- The test uses an isolated temporary table and restores the live store.
+	if gpt_companion_log_knowledge_api ~= nil then
+		gpt_world_snapshot_marker("knowledge_api_core_dispatch")
+		local probe_call_ok, probe_result = pcall(
+			gpt_companion_log_knowledge_api,
+			nil,
+			"level:gpt_world_self_test"
+		)
+		if not probe_call_ok then
+			gpt_world_snapshot_marker("knowledge_api_core_dispatch_failed",
+				string.sub(tostring(probe_result), 1, 48))
+		elseif probe_result == true then
+			gpt_world_snapshot_marker("knowledge_api_core_dispatch_passed")
+		else
+			gpt_world_snapshot_marker("knowledge_api_core_dispatch_failed")
+		end
+	end
 end
 
 -- Retail X-Ray's reliable diagnostic channel in this project is a harmless
@@ -480,10 +502,10 @@ end
 -- optional for this player-following companion and must not block snapshot completion.
 -- Exercise the public knowledge/context API once after the companion is online.
 -- The World Model helper isolates and restores its temporary claims.
-local function gpt_companion_log_knowledge_api(companion_id)
+gpt_companion_log_knowledge_api = function(companion_id, test_level_id)
 	gpt_world_snapshot_marker("knowledge_api_probe_entered")
 	local call_ok, results, error_code = pcall(function()
-		return gpt_world.run_knowledge_api_self_test(companion_id)
+		return gpt_world.run_knowledge_api_self_test(companion_id, test_level_id)
 	end)
 
 	gpt_world_snapshot_marker("knowledge_api_probe_returned")
@@ -501,8 +523,7 @@ local function gpt_companion_log_knowledge_api(companion_id)
 		"claim_read_ok",
 		"known_places_ok",
 		"observation_ok",
-		"unconfirmed_observation_rejected_ok",
-		"context_ok"
+		"unconfirmed_observation_rejected_ok"
 	}
 	for _, check_name in ipairs(checks) do
 		if results[check_name] == true then
@@ -512,12 +533,55 @@ local function gpt_companion_log_knowledge_api(companion_id)
 		end
 	end
 
+	if results.context_skipped == true then
+		gpt_world_snapshot_marker("knowledge_api_context_skipped")
+	elseif results.context_ok == true then
+		gpt_world_snapshot_marker("knowledge_api_context_ok")
+	else
+		gpt_world_snapshot_marker("knowledge_api_context_ok_failed")
+	end
+
 	if results.probe_passed == true then
 		gpt_world_snapshot_marker("knowledge_api_probe_passed")
 	else
 		gpt_world_snapshot_marker("knowledge_api_probe_failed", error_code or results.error or "assertion")
 	end
 	return results.probe_passed == true
+end
+
+-- Engine-backed context is checked separately from the pure knowledge store.
+local function gpt_companion_log_world_context(companion_id)
+	gpt_world_snapshot_marker("context_probe_entered")
+	local call_ok, context, context_error = pcall(function()
+		return gpt_world.get_companion_world_context(companion_id)
+	end)
+	if not call_ok then
+		gpt_world_snapshot_marker("context_call_failed", string.sub(tostring(context), 1, 56))
+		return false
+	end
+	if type(context) ~= "table" then
+		gpt_world_snapshot_marker("context_unavailable", context_error or "no_result")
+		return false
+	end
+
+	local engine = context.engine
+	local level = type(engine) == "table" and engine.level or nil
+	if type(level) ~= "table" or type(level.name) ~= "string" then
+		gpt_world_snapshot_marker("context_level_unavailable")
+		return false
+	end
+	gpt_world_snapshot_marker("context_level", level.name)
+	gpt_world_snapshot_marker("context_online", tostring(engine.is_online))
+
+	if engine.is_online ~= true or type(context.knowledge) ~= "table"
+		or context.knowledge.persistence ~= "session_only"
+		or type(context.knowledge.known_places) ~= "table" then
+		gpt_world_snapshot_marker("context_validation_failed")
+		return false
+	end
+
+	gpt_world_snapshot_marker("context_probe_passed")
+	return true
 end
 
 local function gpt_update_world_snapshot(binder, now)
@@ -546,17 +610,19 @@ local function gpt_update_world_snapshot(binder, now)
 	local online_confirmed = snapshot ~= nil and snapshot.is_online == true
 	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
 	if online_confirmed then
-		if not binder.gpt_world_knowledge_api_checked then
-			gpt_world_snapshot_marker("knowledge_api_dispatch")
-			binder.gpt_world_knowledge_api_checked = true
-			local probe_ok, probe_result = pcall(gpt_companion_log_knowledge_api, companion_id)
-			if not probe_ok then
-				gpt_world_snapshot_marker("knowledge_api_dispatch_failed",
-					string.sub(tostring(probe_result), 1, 48))
-			elseif probe_result == false then
-				gpt_world_snapshot_marker("knowledge_api_dispatch_completed_with_failure")
+		if not binder.gpt_world_context_api_checked then
+			binder.gpt_world_context_api_checked = true
+			local context_call_ok, context_result = pcall(
+				gpt_companion_log_world_context,
+				companion_id
+			)
+			if not context_call_ok then
+				gpt_world_snapshot_marker("context_dispatch_failed",
+					string.sub(tostring(context_result), 1, 48))
+			elseif context_result == true then
+				gpt_world_snapshot_marker("context_dispatch_passed")
 			else
-				gpt_world_snapshot_marker("knowledge_api_dispatch_completed")
+				gpt_world_snapshot_marker("context_dispatch_completed_with_failure")
 			end
 		end
 		binder.gpt_world_snapshot_done = true
@@ -664,7 +730,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
-	self.gpt_world_knowledge_api_checked = false
+	self.gpt_world_context_api_checked = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -700,7 +766,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
-	self.gpt_world_knowledge_api_checked = false
+	self.gpt_world_context_api_checked = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
