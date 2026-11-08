@@ -591,3 +591,12 @@
 - Лечение не исправлялось наугад. В текущем companion custom LTX уже включены `use_medkit = true` и `autoheal = true`; в `character_desc_general.xml` спутнику выдаются 2 аптечки. В стандартной CoP wounded-логике default hp state задан на 20% здоровья, а autoheal выдаёт `medkit_script` после более чем 60 секунд в состоянии wounded. Поэтому лёгкие/средние попадания и короткая пауза после тяжёлого ранения не доказывают, что лечение сломано.
 - Переходы между локациями пока не проверены и остаются отдельным пунктом будущего консолидированного теста.
 - Коммит meet-конфигурации: `a2ebca91275d90d6a178dae72fa9d8b415ade392`. Коммиты статуса и checklist соответственно `e3e629f555afe7042f2bfc04e6dbd525aa3b325b` и `8207457e856a7065042300d07943048b6884dacb`.
+
+
+### Вторая правка реакции компаньона на поднятое оружие — 2026-11-08
+
+- Пользователь проверил предыдущую meet-правку: разговор доступен, но спутник по-прежнему направляет оружие на игрока и говорит убрать оружие.
+- Разобран реальный парсер `xr_meet.script` в ветке проекта. Он использует `close_anim`, `close_snd_hello`, `close_victim`, `snd_on_use`, `use` и другие `close_*` поля. Предыдущая правка в стиле `meet_state_wpn`/`victim_wpn` была не тем форматом для этого parser и не меняла нужный default.
+- Точные default-источники: `close_anim` выбирает `threat_na` при `{=actor_has_weapon}`; `close_snd_hello` выбирает `meet_hide_weapon`; `snd_on_use` выбирает `meet_use_no_weapon`; `use` при поднятом оружии возвращает false. `state_lib.script` подтверждает, что `threat_na` использует weapon=`unstrapped`, а `wait` — weapon=`strapped`.
+- Новая конфигурация в `[gpt_companion_meet]`: armed actor -> `close_anim=wait`, `close_victim=nil`, `close_snd_hello=nil`, `snd_on_use=nil`; `use=true` сохраняет возможность разговора, `abuse=false` выключает обижание. При отсутствии оружия остаются `talk_default` и `meet_hello`.
+- Commit `092443a66ee22ac1d887c2fae6917d93fbc97935`. Это статически согласовано с текущим парсером проекта; CoP runtime не запускался, поэтому просится один повторный игровой тест.
