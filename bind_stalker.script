@@ -405,18 +405,15 @@ local function gpt_world_log_module_status(binder)
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
 end
 
--- Snapshot markers use the console channel visible in retail xray_administrator.log.
--- This diagnostic channel is separate from normal printf output.
+-- Use the ordinary game log for World Model diagnostics. Executing synthetic
+-- console commands here can interrupt the actor update path on some X-Ray builds.
 local function gpt_world_snapshot_marker(name, value)
 	local token = tostring(name)
 	if value ~= nil then
 		token = token .. "_" .. tostring(value)
 	end
 	token = string.sub(string.gsub(token, "[^%w_]", "_"), 1, 96)
-
-	pcall(function()
-		get_console():execute("gpt_companion_diag_world_snapshot_" .. token)
-	end)
+	printf("[GPT_WORLD_SNAPSHOT] %s", token)
 end
 
 -- The snapshot is objective engine context, not persistent companion knowledge.
@@ -439,28 +436,25 @@ local function gpt_companion_log_world_snapshot(companion_id)
 		return nil, error_code or "unknown"
 	end
 
-	local level_name = snapshot.level and snapshot.level.name
-	if type(level_name) == "string" and level_name ~= "" then
-		gpt_world_snapshot_marker("level", level_name)
-	else
-		gpt_world_snapshot_marker("level_unavailable")
-	end
+	gpt_world_snapshot_marker("snapshot_table_received")
+	local fields_ok, fields_error = pcall(function()
+		local level_name = snapshot.level and snapshot.level.name
+		if type(level_name) == "string" and level_name ~= "" then
+			gpt_world_snapshot_marker("level", level_name)
+		else
+			gpt_world_snapshot_marker("level_unavailable")
+		end
 
-	gpt_world_snapshot_marker("online", tostring(snapshot.is_online))
+		gpt_world_snapshot_marker("online", tostring(snapshot.is_online))
 
-	local smart_name = snapshot.smart_terrain and snapshot.smart_terrain.name
-	if type(smart_name) == "string" and smart_name ~= "" then
-		gpt_world_snapshot_marker("smart", smart_name)
-	else
-		gpt_world_snapshot_marker("smart_none")
-	end
+		local smart_name = snapshot.smart_terrain and snapshot.smart_terrain.name
+		if type(smart_name) == "string" and smart_name ~= "" then
+			gpt_world_snapshot_marker("smart", smart_name)
+		else
+			gpt_world_snapshot_marker("smart_none")
+		end
 
-	-- Mark the core location snapshot complete before inspecting optional
-	-- Smart Terrain metadata. The companion may legitimately have no Smart Terrain.
-	gpt_world_snapshot_marker("read_ok")
-
-	-- Optional metadata must never prevent the knowledge API probe from running.
-	local smart_meta_ok, smart_meta_error = pcall(function()
+		-- No Smart Terrain is a valid state for this follower NPC.
 		if type(snapshot.smart_terrain_status) == "string" then
 			gpt_world_snapshot_marker("smart_status", snapshot.smart_terrain_status)
 		end
@@ -468,10 +462,13 @@ local function gpt_companion_log_world_snapshot(companion_id)
 			gpt_world_snapshot_marker("smart_id", tostring(snapshot.smart_terrain_alife_object_id))
 		end
 	end)
-	if not smart_meta_ok then
-		gpt_world_snapshot_marker("smart_metadata_failed", string.sub(tostring(smart_meta_error), 1, 48))
+
+	if not fields_ok then
+		gpt_world_snapshot_marker("field_read_failed", string.sub(tostring(fields_error), 1, 64))
+		return nil, "snapshot_field_read_failed"
 	end
 
+	gpt_world_snapshot_marker("read_ok")
 	return snapshot, nil
 end
 
@@ -488,11 +485,11 @@ local function gpt_companion_log_knowledge_api(companion_id)
 	gpt_world_snapshot_marker("knowledge_api_probe_returned")
 	if not call_ok then
 		gpt_world_snapshot_marker("knowledge_api_call_failed", string.sub(tostring(results), 1, 64))
-		return
+		return false
 	end
 	if type(results) ~= "table" then
 		gpt_world_snapshot_marker("knowledge_api_call_failed", error_code or "no_result")
-		return
+		return false
 	end
 
 	local checks = {
@@ -516,6 +513,7 @@ local function gpt_companion_log_knowledge_api(companion_id)
 	else
 		gpt_world_snapshot_marker("knowledge_api_probe_failed", error_code or results.error or "assertion")
 	end
+	return results.probe_passed == true
 end
 
 local function gpt_update_world_snapshot(binder, now)
@@ -531,8 +529,15 @@ local function gpt_update_world_snapshot(binder, now)
 	local attempt = binder.gpt_world_snapshot_attempts
 	gpt_world_snapshot_marker("attempt", tostring(attempt))
 
-	local snapshot = gpt_companion_log_world_snapshot(companion_id)
-	gpt_world_snapshot_marker("snapshot_returned", tostring(snapshot ~= nil))
+	local snapshot_call_ok, snapshot, snapshot_error =
+		pcall(gpt_companion_log_world_snapshot, companion_id)
+	gpt_world_snapshot_marker("snapshot_call_returned_" .. tostring(snapshot_call_ok))
+	if not snapshot_call_ok then
+		gpt_world_snapshot_marker("snapshot_call_crashed", string.sub(tostring(snapshot), 1, 56))
+		snapshot = nil
+	elseif snapshot == nil and snapshot_error ~= nil then
+		gpt_world_snapshot_marker("snapshot_not_available", tostring(snapshot_error))
+	end
 
 	local online_confirmed = snapshot ~= nil and snapshot.is_online == true
 	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
@@ -540,12 +545,14 @@ local function gpt_update_world_snapshot(binder, now)
 		if not binder.gpt_world_knowledge_api_checked then
 			gpt_world_snapshot_marker("knowledge_api_dispatch")
 			binder.gpt_world_knowledge_api_checked = true
-			local probe_ok, probe_error = pcall(gpt_companion_log_knowledge_api, companion_id)
+			local probe_ok, probe_result = pcall(gpt_companion_log_knowledge_api, companion_id)
 			if not probe_ok then
 				gpt_world_snapshot_marker("knowledge_api_dispatch_failed",
-					string.sub(tostring(probe_error), 1, 48))
+					string.sub(tostring(probe_result), 1, 48))
+			elseif probe_result == false then
+				gpt_world_snapshot_marker("knowledge_api_dispatch_completed_with_failure")
 			else
-				gpt_world_snapshot_marker("knowledge_api_dispatch_returned")
+				gpt_world_snapshot_marker("knowledge_api_dispatch_completed")
 			end
 		end
 		binder.gpt_world_snapshot_done = true
