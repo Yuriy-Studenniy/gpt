@@ -88,6 +88,16 @@ local function gpt_world_get_companion_server_object(simulation)
     return companion, companion_id
 end
 
+local function gpt_world_get_online_companion_object(companion_id)
+    if type(db) ~= "table" then
+        return nil
+    end
+
+    local storage = gpt_world_safe_index(db, "storage")
+    local companion_storage = gpt_world_safe_index(storage, companion_id)
+    return gpt_world_safe_index(companion_storage, "object")
+end
+
 local function gpt_world_get_game_vertex_id(companion)
     local game_vertex_id = gpt_world_safe_index(companion, "m_game_vertex_id")
     if type(game_vertex_id) == "number" then
@@ -130,8 +140,11 @@ local function gpt_world_resolve_level(simulation, graph, game_vertex_id)
     }
 end
 
-local function gpt_world_resolve_smart_terrain(simulation, companion, level_name)
-    local smart_terrain_id = gpt_world_safe_index(companion, "m_smart_terrain_id")
+local function gpt_world_resolve_smart_terrain(simulation, server_companion, online_companion, level_name)
+    local smart_terrain_id = gpt_world_safe_index(server_companion, "m_smart_terrain_id")
+    if type(smart_terrain_id) ~= "number" then
+        smart_terrain_id = gpt_world_safe_index(online_companion, "m_smart_terrain_id")
+    end
     if type(smart_terrain_id) ~= "number"
         or smart_terrain_id == GPT_WORLD_NO_SMART_TERRAIN_ID
         or smart_terrain_id <= 0 then
@@ -179,7 +192,14 @@ function gpt_world.get_companion_location_snapshot()
         return nil, companion_id
     end
 
-    local game_vertex_id = gpt_world_get_game_vertex_id(companion)
+    -- The online object exposes the live game vertex. The server-side
+    -- A-Life object is the fallback for an offline companion.
+    local online_companion = gpt_world_get_online_companion_object(companion_id)
+    local runtime_companion = online_companion or companion
+    local game_vertex_id = gpt_world_get_game_vertex_id(runtime_companion)
+    if game_vertex_id == nil and runtime_companion ~= companion then
+        game_vertex_id = gpt_world_get_game_vertex_id(companion)
+    end
     if game_vertex_id == nil then
         return nil, "companion_game_vertex_unavailable"
     end
@@ -194,11 +214,17 @@ function gpt_world.get_companion_location_snapshot()
         return nil, "companion_level_unavailable"
     end
 
-    local smart_terrain = gpt_world_resolve_smart_terrain(simulation, companion, level.name)
+    local smart_terrain = gpt_world_resolve_smart_terrain(
+        simulation,
+        companion,
+        online_companion,
+        level.name
+    )
 
     return {
         companion_story_id = GPT_WORLD_COMPANION_STORY_ID,
         companion_alife_object_id = companion_id,
+        is_online = online_companion ~= nil,
         level = level,
         smart_terrain = smart_terrain,
         source = "xray_alife_snapshot"
