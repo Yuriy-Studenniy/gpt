@@ -11,6 +11,79 @@ gpt_world = gpt_world or {}
 local GPT_WORLD_COMPANION_STORY_ID = "gpt_companion_main"
 local GPT_WORLD_NO_SMART_TERRAIN_ID = 65535
 
+-- These are engine level names found in sim_board.script's
+-- group_id_by_levels mapping. The table is a static catalog, not knowledge.
+-- Numeric Game Graph level IDs are resolved from the engine at runtime.
+local GPT_WORLD_LEVEL_CATALOG = {
+    ["level:zaton"] = {
+        entity_id = "level:zaton",
+        entity_type = "level",
+        engine_name = "zaton",
+        catalog_source = "sim_board.group_id_by_levels"
+    },
+    ["level:jupiter"] = {
+        entity_id = "level:jupiter",
+        entity_type = "level",
+        engine_name = "jupiter",
+        catalog_source = "sim_board.group_id_by_levels"
+    },
+    ["level:pripyat"] = {
+        entity_id = "level:pripyat",
+        entity_type = "level",
+        engine_name = "pripyat",
+        catalog_source = "sim_board.group_id_by_levels"
+    },
+    ["level:labx8"] = {
+        entity_id = "level:labx8",
+        entity_type = "level",
+        engine_name = "labx8",
+        catalog_source = "sim_board.group_id_by_levels"
+    },
+    ["level:jupiter_underground"] = {
+        entity_id = "level:jupiter_underground",
+        entity_type = "level",
+        engine_name = "jupiter_underground",
+        catalog_source = "sim_board.group_id_by_levels"
+    }
+}
+
+local function gpt_world_copy_record(record)
+    if type(record) ~= "table" then
+        return nil
+    end
+
+    local copy = {}
+    for key, value in pairs(record) do
+        copy[key] = value
+    end
+    return copy
+end
+
+-- Static catalog lookup. Catalog presence must never be treated as
+-- evidence that the companion knows or has visited the location.
+function gpt_world.get_catalog_entity(entity_id)
+    if type(entity_id) ~= "string" then
+        return nil
+    end
+
+    return gpt_world_copy_record(GPT_WORLD_LEVEL_CATALOG[entity_id])
+end
+
+-- Returns a fresh array of static level descriptors.
+-- It is intentionally separate from the companion's known-place queries.
+function gpt_world.get_catalog_levels()
+    local result = {}
+    for entity_id, record in pairs(GPT_WORLD_LEVEL_CATALOG) do
+        result[#result + 1] = gpt_world_copy_record(record)
+    end
+
+    table.sort(result, function(left, right)
+        return left.entity_id < right.entity_id
+    end)
+
+    return result
+end
+
 local function gpt_world_safe_index(object, field_name)
     if object == nil then
         return nil
