@@ -101,6 +101,13 @@ local function gpt_consume_companion_item(npc, section, need_name, relief)
 end
 
 local function gpt_try_companion_consumption(npc)
+	-- Fail closed if actor bootstrap has not exposed the shared state API.
+	if type(gpt_companion_get_need) ~= "function"
+		or type(gpt_companion_set_need) ~= "function" then
+		printf("[GPT_COMPANION] Need API is unavailable; skipping consumption")
+		return false
+	end
+
 	if npc == nil or npc:alive() ~= true then
 		return false
 	end
