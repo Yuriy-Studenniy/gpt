@@ -759,3 +759,13 @@
 - `bind_stalker.script` запускает self-test один раз после подтверждения companion `online_true`, независимо от дальнейшего хода игры. Retail-visible markers перечислены в `IN_GAME_TEST_CHECKLIST.md`; все markers используют уже проверенный `get_console():execute()` канал.
 - Тест использует фактический level entity ID из snapshot, поэтому не привязан к Затону. Синхронный переход локации во время самого короткого теста маловероятен, но runtime-проверка должна подтвердить поведение в оригинальном CoP.
 - Статическая проверка после добавления self-test пройдёт отдельно; результат в игре пока не подтверждён.
+
+## 2026-11-09 — Разделение World Model self-test на независимые этапы
+
+- Повторные runtime-логи подтверждали snapshot до `smart_id_65535`, но не показывали переход к knowledge self-test. Предыдущая схема связывала core claims test с результатом location snapshot и запускала всё в одном actor update; диагностически это смешивало две независимые подсистемы.
+- В `gpt_world.script` `run_knowledge_api_self_test(companion_alife_id?, test_level_id_override?)` теперь допускает isolated core run без A-Life ID и использует synthetic `level:gpt_world_self_test`. Временный claim store и sequence ID по-прежнему восстанавливаются при успехе и при ошибке.
+- В `bind_stalker.script` core self-test запускается сразу после подтверждённой lazy-load каталога World Model. Он проверяет запись/чтение claims, defensive copy, level filter, confirmed observation и отказ неподтверждённого observation. Результат не зависит от snapshot и Smart Terrain.
+- После `online_true` запускается только отдельная проверка `get_companion_world_context()`; она проверяет фактический engine level, online-флаг и наличие knowledge envelope.
+- Retail diagnostics оставлены на подтверждённом канале `get_console():execute()`; `printf` не используется как критерий прохождения тестов.
+- Статические block-balance проверки обоих Lua-файлов прошли. Lua compiler и целевой CoP runtime в этой среде недоступны; обе новые runtime-проверки пока ожидают подтверждения пользовательским логом.
+- Изменения кода опубликованы в `main`: `gpt_world.script` commit `2d99de894a7ee5af6a265037df5172d7bfc62518`; `bind_stalker.script` обновлён последовательными коммитами разделения и диагностики.
