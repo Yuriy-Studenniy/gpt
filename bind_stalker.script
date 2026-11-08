@@ -325,7 +325,12 @@ local function ensure_gpt_companion_spawned(actor)
 		local existing_object = alife():object(existing_id)
 		if existing_object ~= nil then
 			printf("[GPT_COMPANION] Existing companion found: id=%s", tostring(existing_id))
-			local squad_id, setup_status = ensure_gpt_companion_squad(existing_id, actor)
+			local squad_call_ok, squad_id, setup_status =
+				pcall(ensure_gpt_companion_squad, existing_id, actor)
+			if not squad_call_ok then
+				printf("[GPT_COMPANION] ERROR: squad setup raised an exception: %s", tostring(squad_id))
+				return nil, "squad_setup_exception", existing_id
+			end
 			if squad_id == nil then
 				return nil, setup_status, existing_id
 			end
@@ -355,7 +360,12 @@ local function ensure_gpt_companion_spawned(actor)
 
 	printf("[GPT_COMPANION] Created unique companion: id=%s", tostring(companion.id))
 	gpt_companion_diagnostic("Created unique companion id " .. tostring(companion.id))
-	local squad_id, setup_status = ensure_gpt_companion_squad(companion.id, actor)
+	local squad_call_ok, squad_id, setup_status =
+		pcall(ensure_gpt_companion_squad, companion.id, actor)
+	if not squad_call_ok then
+		printf("[GPT_COMPANION] ERROR: squad setup raised an exception: %s", tostring(squad_id))
+		return nil, "squad_setup_exception", companion.id
+	end
 	if squad_id == nil then
 		return nil, setup_status, companion.id
 	end
