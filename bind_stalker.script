@@ -468,6 +468,45 @@ end
 
 -- Retry briefly until the companion is confirmed online. Smart Terrain is
 -- optional for this player-following companion and must not block snapshot completion.
+-- Exercise the public knowledge/context API once after the companion is online.
+-- The World Model helper isolates and restores its temporary claims.
+local function gpt_companion_log_knowledge_api(companion_id)
+	local call_ok, results, error_code = pcall(function()
+		return gpt_world.run_knowledge_api_self_test(companion_id)
+	end)
+
+	if not call_ok then
+		gpt_world_snapshot_marker("knowledge_api_call_failed", string.sub(tostring(results), 1, 64))
+		return
+	end
+	if type(results) ~= "table" then
+		gpt_world_snapshot_marker("knowledge_api_call_failed", error_code or "no_result")
+		return
+	end
+
+	local checks = {
+		"claim_write_ok",
+		"claim_read_ok",
+		"known_places_ok",
+		"observation_ok",
+		"unconfirmed_observation_rejected_ok",
+		"context_ok"
+	}
+	for _, check_name in ipairs(checks) do
+		if results[check_name] == true then
+			gpt_world_snapshot_marker("knowledge_api_" .. check_name)
+		else
+			gpt_world_snapshot_marker("knowledge_api_" .. check_name .. "_failed")
+		end
+	end
+
+	if results.probe_passed == true then
+		gpt_world_snapshot_marker("knowledge_api_probe_passed")
+	else
+		gpt_world_snapshot_marker("knowledge_api_probe_failed", error_code or results.error or "assertion")
+	end
+end
+
 local function gpt_update_world_snapshot(binder, now)
 	local companion_id = binder.gpt_world_snapshot_companion_id
 	if companion_id == nil or binder.gpt_world_snapshot_done then
@@ -483,6 +522,10 @@ local function gpt_update_world_snapshot(binder, now)
 
 	local snapshot = gpt_companion_log_world_snapshot(companion_id)
 	if snapshot ~= nil and snapshot.is_online == true then
+		if not binder.gpt_world_knowledge_api_checked then
+			binder.gpt_world_knowledge_api_checked = true
+			gpt_companion_log_knowledge_api(companion_id)
+		end
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
@@ -588,6 +631,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
+	self.gpt_world_knowledge_api_checked = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -623,6 +667,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
+	self.gpt_world_knowledge_api_checked = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
