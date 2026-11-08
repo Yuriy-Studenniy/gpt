@@ -21,10 +21,24 @@ enable_talk = true
 
 
 [gpt_companion_meet]
-meet_state = 30|wait@nil
-meet_state_wpn = 30|wait@nil
-victim = 30|actor
-victim_wpn = 30|actor
+; CoP 1.6.02 xr_meet.script uses close_* fields for the active meet manager.
+; The default armed-actor reaction is threat_na + meet_hide_weapon.
+close_distance = 3
+close_anim = {=actor_has_weapon} wait, talk_default
+close_victim = {=actor_has_weapon} nil, actor
+close_snd_distance = 3
+close_snd_hello = {=actor_has_weapon} nil, meet_hello
+close_snd_bye = nil
+far_distance = 5
+far_anim = nil
+far_snd_distance = 5
+far_snd = nil
+far_victim = nil
+snd_on_use = {=actor_has_weapon} nil, nil
 use = true
-use_wpn = true
+meet_dialog = nil
 abuse = false
+trade_enable = true
+allow_break = true
+meet_on_talking = true
+use_text = nil
