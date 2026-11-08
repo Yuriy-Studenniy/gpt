@@ -502,8 +502,8 @@ end
 
 -- Retry briefly until the companion is confirmed online. Smart Terrain is
 -- optional for this player-following companion and must not block snapshot completion.
--- Exercise the public knowledge/context API once after the companion is online.
--- The World Model helper isolates and restores its temporary claims.
+-- The isolated claim/observation store test already runs at module load; only the
+-- live engine/context adapter is checked here after the companion becomes online.
 gpt_companion_log_knowledge_api = function(companion_id, test_level_id)
 	gpt_world_snapshot_marker("knowledge_api_probe_entered")
 	local call_ok, results, error_code = pcall(function()
