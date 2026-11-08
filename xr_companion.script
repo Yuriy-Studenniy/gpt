@@ -5,8 +5,7 @@ local keep_state_min_time = 1000 -- ïåðåêëþ÷èâøèñü â ñîñòîÿ
 
 local dist_walk = 1.5 -- walking is allowed only while the companion is within this distance of the actor
 local dist_run = 20 -- use the running follow state beyond the walk distance
-local dist_run = 20
--- otherwise - sprint
+-- rush and assault both use X-Ray's run movement type.
 
 local sound_wait = "weather,state"
 
@@ -51,6 +50,8 @@ function action_companion_activity:initialize()
 	self.last_state = "guard_na"
 	state_mgr.set_state(self.object, self.last_state, nil, nil, nil, { animation = true })
 	self.keep_state_until = time_global()
+	self.follow_no_point_logged = false
+	printf("[GPT_COMPANION_FOLLOW] activity action initialized for %s", self.object:name())
 end
 
 function action_companion_activity:beh_walk_simple()
@@ -73,11 +74,20 @@ function action_companion_activity:beh_walk_simple()
 	if select_new_pt then
 		self.assist_point = select_position(self.object, self.st)
 		if not self.assist_point then
+			if not self.follow_no_point_logged then
+				self.follow_no_point_logged = true
+				printf("[GPT_COMPANION_FOLLOW] no accessible follow waypoint for %s", self.object:name())
+			end
 			return
 		end
 	elseif not self.assist_point then
+		if not self.follow_no_point_logged then
+			self.follow_no_point_logged = true
+			printf("[GPT_COMPANION_FOLLOW] no accessible follow waypoint for %s", self.object:name())
+		end
 		return
 	end
+	self.follow_no_point_logged = false
 
 	-- 2. Äâèãàåìñÿ íà òî÷êó: åñëè òî÷êà äàëåêî - áåæèì, èíà÷å èäåì
 	self.object:set_path_type(game_object.level_path)
@@ -117,6 +127,8 @@ function action_companion_activity:beh_walk_simple()
 	end
 
 	if new_state and new_state ~= self.last_state then
+		printf("[GPT_COMPANION_FOLLOW] state=%s actor_distance=%s waypoint_distance=%s",
+			tostring(new_state), tostring(dist_from_self_to_actor), tostring(dist_to_assist_pt))
 		state_mgr.set_state(self.object, new_state,
 			nil, nil, target, { animation = true })
 		self.last_state = new_state
