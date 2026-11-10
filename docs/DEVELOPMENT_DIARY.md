@@ -776,3 +776,10 @@
 - Удалён автоматический core knowledge self-test из module-load/update path, а также автоматический engine-context probe после online snapshot. Из update-цикла убрана вся автоматическая self-test работа; оставлены ранее проверенные lazy-load диагностика, read-only snapshot и штатный companion setup.
 - `gpt_world.run_knowledge_api_self_test()` оставлена как API-функция в `gpt_world.script`, но больше не вызывается автоматически. Её безопасный запуск нужно спроектировать отдельно — вне критического actor update/spawn пути.
 - Текущий `bind_stalker.script` опубликован в commit `169dabc11f60512f8ec1cafb5e7a727f104b8d2e`. Структурная проверка блоков и скобок прошла. Runtime-восстановление spawn ещё не подтверждено.
+
+## 2026-11-10 — Runtime подтверждение восстановления snapshot-only пути
+
+- После удаления автоматических core/context self-test вызовов из `actor_binder:update` пользователь прислал новый retail-лог: `attempt_1`, `snapshot_table_received`, `level_zaton`, `online_true`, `smart_none`, `smart_status_no_smart_terrain_assigned`, `smart_id_65535`, `read_ok`, `snapshot_call_returned_true`, `online_gate_true`, `polling_complete`.
+- Это runtime-подтверждение, что спутник снова доступен как online A-Life object и location snapshot завершается за одну попытку после rollback. Отсутствие Smart Terrain штатно и не блокирует завершение.
+- Knowledge API self-test остаётся доступным в `gpt_world.script`, но автоматический запуск не возвращать в actor update. Следующий дизайн должен использовать отдельный отложенный/debug entry point, вызываемый вне critical spawn path.
+- Визуальное присутствие/следование NPC и полный регрессионный прогон этим фрагментом не подтверждены.
