@@ -4,7 +4,7 @@
 Заключительный статический аудит главы 1: [CHAPTER_1_FINAL_AUDIT.md](CHAPTER_1_FINAL_AUDIT.md)  
 Основной репозиторий: https://github.com/Yuriy-Studenniy/gpt  
 Базовая ветка подтверждённой игровой конфигурации: `main`  
-Текущая ветка реализации World Model: `world-model-completion` (runtime ещё не подтверждён)  
+Текущая ветка реализации World Model: `world-model-completion` (MVP runtime и save/load подтверждены в CoP 1.6.02 пользователем)  
 Базовый коммит аудита исходного состояния: `e4daa8d4dcf590ee847dc9f8092cddacf921bc2d`  
 Последняя учтённая игровая конфигурация: `092443a66ee22ac1d887c2fae6917d93fbc97935` (meet; пользователь подтвердил поведение в игре)
 Коммит добавления чек-листа: `7c96551d1490b3623e74ae5c8caa84849f76be53`
@@ -140,9 +140,9 @@
 
 World Model опрашивается только из `bind_stalker.script`, после подтверждения companion/squad setup, с периодом 15 секунд. В `xr_motivator.script`, `motivator_binder:update()` и NPC `update_logic()` интеграции нет — штатная логика движения/боя не затрагивается этим новым кодом. После `pstor_load_all()` очищается Lua session cache, а отдельная проверка определяет, восстановилось ли текущее знание из сохранения.
 
-**Runtime-статус:** эта end-to-end версия находится в ветке `world-model-completion` и ещё не проверена в оригинальном CoP 1.6.02. Структурный статический анализ пройден, но это не компиляция Lua и не runtime-доказательство. Приёмка в игре: `knowledge_runtime_passed` после реального online snapshot → записи → чтения context; затем `knowledge_pstor_restore_verified_<level>` после сохранения и повторной загрузки. Второй маркер закрывает save/load-проверку.
+**Runtime-статус: MVP проверен в оригинальном CoP 1.6.02 по игровым логам пользователя (2026-11-10).** Подтверждена end-to-end цепочка: реальный online snapshot компаньона на `zaton` → запись наблюдения → чтение `get_companion_world_context()` → обнаружение текущего уровня среди сохранённых знаний. В первом проходе появились `knowledge_observation_recorded_level_zaton`, `knowledge_context_read_ok_level_zaton`, `knowledge_current_level_persisted_level_zaton` и `knowledge_runtime_passed`. В повторной загрузке после `knowledge_session_cache_reset_after_load` появились `knowledge_observation_already_known_level_zaton`, `knowledge_context_read_ok_level_zaton`, `knowledge_current_level_persisted_level_zaton`, **`knowledge_pstor_restore_verified_level_zaton`**, `knowledge_level_verified_level_zaton` и `knowledge_runtime_passed`. Это подтверждает восстановление знания из actor PSTOR после сброса Lua session cache, а не только повторную запись в новой сессии.
 
-Предыдущие игровые логи подтверждали только lazy-load каталога и старый read-only snapshot на Затоне; они не доказывают новую запись знаний. Последний присланный лог обрывался до `read_ok`, поэтому сам тот запуск snapshot не считается завершённым.
+Smart Terrain на Затоне вернул sentinel `65535` / `no_smart_terrain_assigned`; для follower-компаньона это допустимо и не блокирует запись уровня. Проверены только online snapshot, каталогизированное знание о текущем уровне, чтение контекста и save/load этого знания. Переходы на Юпитер/Припять, обнаружение POI/тайников, сканирование остальных объектов и использование знаний в диалогах/выборе действий в этот MVP не входят. Статический анализ не считается компиляцией Lua; runtime-подтверждение относится только к перечисленным сценариям.
 
 Границы этого шага: запоминается уровень, где компаньон действительно находится online, и каталогизированный Smart Terrain, если он назначен. Сканирования POI, тайников и объектов нет; все места уровня автоматически известными не становятся; влияние знаний на диалоги и решения NPC будет подключаться отдельным следующим слоем Character Core. Изолированный `run_knowledge_api_self_test()` не считается доказательством игровой интеграции.
 
