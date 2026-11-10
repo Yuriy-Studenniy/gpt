@@ -1053,7 +1053,10 @@ local function gpt_world_observe_catalog_entity(entity_id, level_id, source_id, 
 
     local existing_claims = gpt_world.get_claims(entity_id, "known_place")
     for _, existing_claim in ipairs(existing_claims) do
-        if existing_claim.value == true then
+        if existing_claim.value == true
+            and existing_claim.status == "observed"
+            and existing_claim.source_type == "observation"
+            and existing_claim.source_id == source_id then
             return existing_claim, false, nil
         end
     end
