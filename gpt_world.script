@@ -2,8 +2,9 @@
     GPT World Model - read-only X-Ray adapter
     Target: S.T.A.L.K.E.R.: Call of Pripyat 1.6.02 / original X-Ray
 
-    This module reads the current A-Life location of the unique companion.
-    It does not discover places, persist knowledge, or change NPC behavior.
+    This module provides a static world catalog, read-only X-Ray snapshots,
+    and explicit source-aware knowledge claims for the unique companion.
+    It does not scan the world, call an LLM, or change NPC behavior.
 ]]
 
 gpt_world = gpt_world or {}
@@ -478,6 +479,59 @@ local GPT_WORLD_SMART_TERRAIN_CATALOG = {
     }
 }
 
+
+-- Small curated seed of named narrative places on Zaton.
+-- Each POI points to a coarse Smart Terrain anchor; this is not a coordinate,
+-- visibility radius, or claim that the companion already knows the place.
+-- Catalog membership alone never creates character knowledge.
+local GPT_WORLD_POI_CATALOG = {
+    ["poi:zaton:skadovsk"] = {
+        entity_id = "poi:zaton:skadovsk",
+        entity_type = "poi",
+        level_id = "level:zaton",
+        display_name = "Скадовск",
+        category = "stalker_hub",
+        anchor_entity_id = "smart:zaton:zat_stalker_base_smart",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation_objects_props.ltx:zat_stalker_base_smart" }
+    },
+    ["poi:zaton:ranger_station"] = {
+        entity_id = "poi:zaton:ranger_station",
+        entity_type = "poi",
+        level_id = "level:zaton",
+        display_name = "Станция рейнджеров",
+        category = "stalker_base",
+        anchor_entity_id = "smart:zaton:zat_b5_smart_terrain",
+        source_records = { "simulation_objects_props.ltx:zat_b5_smart_terrain" }
+    },
+    ["poi:zaton:dredger_station"] = {
+        entity_id = "poi:zaton:dredger_station",
+        entity_type = "poi",
+        level_id = "level:zaton",
+        display_name = "Земснаряд",
+        category = "landmark",
+        anchor_entity_id = "smart:zaton:zat_b14_smart_terrain",
+        source_records = { "simulation_objects_props.ltx:zat_b14_smart_terrain" }
+    },
+    ["poi:zaton:iron_forest"] = {
+        entity_id = "poi:zaton:iron_forest",
+        entity_type = "poi",
+        level_id = "level:zaton",
+        display_name = "Железный лес",
+        category = "landmark",
+        anchor_entity_id = "smart:zaton:zat_b100",
+        source_records = { "simulation.ltx:start_position_zaton", "simulation_objects_props.ltx:zat_b100" }
+    },
+    ["poi:zaton:old_barge"] = {
+        entity_id = "poi:zaton:old_barge",
+        entity_type = "poi",
+        level_id = "level:zaton",
+        display_name = "Старая баржа",
+        category = "hideout",
+        anchor_entity_id = "smart:zaton:zat_b18",
+        source_records = { "simulation.ltx:start_position_zaton:zat_b18_noah_squad" }
+    }
+}
+
 local function gpt_world_copy_record(record)
     if type(record) ~= "table" then
         return nil
@@ -507,6 +561,7 @@ function gpt_world.get_catalog_entity(entity_id)
 
     local record = GPT_WORLD_LEVEL_CATALOG[entity_id]
         or GPT_WORLD_SMART_TERRAIN_CATALOG[entity_id]
+        or GPT_WORLD_POI_CATALOG[entity_id]
     return gpt_world_copy_record(record)
 end
 
@@ -519,6 +574,26 @@ function gpt_world.get_catalog_smart_terrains(level_entity_id)
 
     local result = {}
     for _, record in pairs(GPT_WORLD_SMART_TERRAIN_CATALOG) do
+        if level_entity_id == nil or record.level_id == level_entity_id then
+            result[#result + 1] = gpt_world_copy_record(record)
+        end
+    end
+
+    table.sort(result, function(left, right)
+        return left.entity_id < right.entity_id
+    end)
+
+    return result
+end
+
+-- Returns a fresh array of named POIs. Catalog presence never implies knowledge.
+function gpt_world.get_catalog_pois(level_entity_id)
+    if level_entity_id ~= nil and type(level_entity_id) ~= "string" then
+        return {}
+    end
+
+    local result = {}
+    for _, record in pairs(GPT_WORLD_POI_CATALOG) do
         if level_entity_id == nil or record.level_id == level_entity_id then
             result[#result + 1] = gpt_world_copy_record(record)
         end
@@ -1145,11 +1220,21 @@ function gpt_world.get_known_places(filters)
             if include_place then
                 local entry = places_by_id[place_id]
                 if entry == nil then
+                    local catalog_record = gpt_world.get_catalog_entity(place_id)
                     entry = {
                         entity_id = place_id,
+                        level_id = claim.level_id
+                            or (catalog_record and catalog_record.level_id) or nil,
                         claims = {},
                         known = false
                     }
+                    if catalog_record ~= nil then
+                        entry.catalog = {
+                            entity_type = catalog_record.entity_type,
+                            display_name = catalog_record.display_name,
+                            category = catalog_record.category
+                        }
+                    end
                     places_by_id[place_id] = entry
                 end
 
@@ -1415,6 +1500,8 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         known_places_ok = false,
         observation_ok = false,
         unconfirmed_observation_rejected_ok = false,
+        poi_catalog_ok = false,
+        provenance_ok = false,
         context_ok = false,
         context_skipped = false,
         probe_passed = false
@@ -1452,6 +1539,24 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         if type(initially_known_places) ~= "table" or #initially_known_places ~= 0 then
             error("catalog_entries_leaked_into_knowledge")
         end
+
+        local skadovsk_catalog = gpt_world.get_catalog_entity("poi:zaton:skadovsk")
+        local zaton_pois = gpt_world.get_catalog_pois("level:zaton")
+        local has_skadovsk = false
+        for _, poi in ipairs(zaton_pois) do
+            if poi.entity_id == "poi:zaton:skadovsk"
+                and poi.anchor_entity_id == "smart:zaton:zat_stalker_base_smart" then
+                has_skadovsk = true
+            end
+        end
+        if type(skadovsk_catalog) ~= "table"
+            or skadovsk_catalog.entity_type ~= "poi"
+            or skadovsk_catalog.level_id ~= "level:zaton"
+            or type(zaton_pois) ~= "table" or #zaton_pois ~= 5
+            or not has_skadovsk then
+            error("poi_catalog_lookup_mismatch")
+        end
+        result.poi_catalog_ok = true
 
         local claim, claim_error = gpt_world.record_claim({
             subject_id = "poi:gpt_world_self_test:claim",
@@ -1529,6 +1634,61 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         end
         result.observation_ok = true
 
+        -- Reported and inferred POI claims remain session-only in this MVP.
+        -- They must not be promoted to observed facts or written to PSTOR.
+        local reported_poi, reported_error = gpt_world.record_claim({
+            subject_id = "poi:zaton:skadovsk",
+            level_id = "level:zaton",
+            predicate = "known_place",
+            value = true,
+            status = "reported",
+            source_type = "conversation",
+            source_id = "gpt_world_self_test_npc",
+            confidence = 0.75,
+            created_at = 2.5,
+            last_confirmed_at = 2.5
+        })
+        if reported_poi == nil or reported_poi.status ~= "reported"
+            or reported_poi.source_type ~= "conversation"
+            or reported_poi.persistence_backend ~= nil then
+            error("reported_poi_claim_invalid:" .. tostring(reported_error))
+        end
+
+        local inferred_poi, inferred_error = gpt_world.record_claim({
+            subject_id = "poi:zaton:ranger_station",
+            level_id = "level:zaton",
+            predicate = "known_place",
+            value = true,
+            status = "inferred",
+            source_type = "reasoning",
+            source_id = "gpt_world_self_test_reasoning",
+            confidence = 0.55,
+            created_at = 2.75
+        })
+        if inferred_poi == nil or inferred_poi.status ~= "inferred"
+            or inferred_poi.source_type ~= "reasoning"
+            or inferred_poi.persistence_backend ~= nil then
+            error("inferred_poi_claim_invalid:" .. tostring(inferred_error))
+        end
+
+        local reported_poi_places = gpt_world.get_known_places({
+            level_id = "level:zaton"
+        })
+        local reported_poi_has_metadata = false
+        for _, place in ipairs(reported_poi_places) do
+            if place.entity_id == "poi:zaton:skadovsk"
+                and place.catalog ~= nil
+                and place.catalog.display_name == "Скадовск"
+                and place.claims[1] ~= nil
+                and place.claims[1].status == "reported" then
+                reported_poi_has_metadata = true
+            end
+        end
+        if not reported_poi_has_metadata then
+            error("reported_poi_metadata_missing")
+        end
+        result.provenance_ok = true
+
         local rejected, reject_error = gpt_world.record_observation({
             event_type = "place_observed",
             confirmed = false,
@@ -1566,7 +1726,8 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
             if type(context.knowledge) ~= "table"
                 or context.knowledge.persistence ~= "session_only"
                 or type(context.knowledge.known_places) ~= "table"
-                or #context.knowledge.known_places ~= 2 then
+                or #context.knowledge.known_places
+                    ~= (test_level_id == "level:zaton" and 4 or 2) then
                 error("world_context_knowledge_mismatch")
             end
             result.context_level_entity_id = context.engine.level.entity_id
@@ -1595,6 +1756,8 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         and result.known_places_ok
         and result.observation_ok
         and result.unconfirmed_observation_rejected_ok
+        and result.poi_catalog_ok
+        and result.provenance_ok
         and (result.context_ok or result.context_skipped)
 
     if not result.probe_passed then
