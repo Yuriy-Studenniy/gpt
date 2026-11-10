@@ -688,6 +688,13 @@ local function gpt_update_companion_world_knowledge(binder, now)
 	end
 	gpt_world_snapshot_marker("knowledge_context_read_ok_" .. level_token)
 	gpt_world_snapshot_marker("knowledge_current_level_persisted_" .. level_token)
+	if observation.save_restore_checked then
+		if observation.save_restore_verified then
+			gpt_world_snapshot_marker("knowledge_pstor_restore_verified_" .. level_token)
+		else
+			gpt_world_snapshot_marker("knowledge_pstor_restore_not_found_" .. level_token)
+		end
+	end
 
 	local verified_levels = binder.gpt_world_knowledge_verified_levels
 	if type(verified_levels) ~= "table" then
