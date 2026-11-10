@@ -159,3 +159,14 @@ gpt_companion_diag_world_snapshot_knowledge_current_level_persisted_level_zaton
 
 `knowledge_runtime_passed` подтверждает связку snapshot → запись реального наблюдения → PSTOR → чтение context. `knowledge_pstor_restore_verified_<level>` отдельно подтверждает наличие знания после save/load. Эти маркеры **не означают**, что компаньон уже использует географические знания для диалогов/выбора действий, и не означают, что он обнаруживает POI или тайники: автоматического сканирования объектов нет.
 
+### Результат игрового теста World Model — 2026-11-10
+
+- [x] Реальный online snapshot спутника на `zaton` получен; `online_true`, `read_ok` и успешное завершение snapshot подтверждены.
+- [x] Реальное наблюдение записано: `knowledge_observation_recorded_level_zaton`.
+- [x] Контекст прочитан обратно: `knowledge_context_read_ok_level_zaton`.
+- [x] Текущий уровень присутствует среди известных мест: `knowledge_current_level_persisted_level_zaton`.
+- [x] Первая end-to-end проверка завершилась `knowledge_runtime_passed`.
+- [x] После save → load сброшен session cache (`knowledge_session_cache_reset_after_load`), знание найдено уже существующим (`knowledge_observation_already_known_level_zaton`) и восстановление подтверждено маркером `knowledge_pstor_restore_verified_level_zaton`; далее получены `knowledge_level_verified_level_zaton` и `knowledge_runtime_passed`.
+- [x] Отсутствие Smart Terrain (`65535`, `no_smart_terrain_assigned`) принято как допустимое состояние follower-компаньона.
+
+**Итог:** MVP World Model по текущему уровню и его сохранению/восстановлению проверен в оригинальном CoP 1.6.02. Это не подтверждает переходы на другие уровни, поиск POI/тайников или использование знаний в диалогах и автономных решениях — они остаются следующими отдельными задачами.
