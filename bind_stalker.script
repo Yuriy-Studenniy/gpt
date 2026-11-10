@@ -480,8 +480,8 @@ local function gpt_companion_log_world_snapshot(companion_id)
 	return snapshot, nil
 end
 
--- Knowledge self-tests run from the companion's own online motivator binder,
--- never from the player's actor update or spawn/setup path.
+-- The startup snapshot reports engine state only. Durable knowledge ingestion
+-- runs separately from actor_binder after companion setup has succeeded.
 
 local function gpt_update_world_snapshot(binder, now)
 	local companion_id = binder.gpt_world_snapshot_companion_id
