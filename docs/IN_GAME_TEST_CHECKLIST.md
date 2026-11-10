@@ -128,6 +128,30 @@
 
 Проваленный пункт фиксируется с точными шагами воспроизведения и логом. Исправление проверяется по всей связанной цепочке, а не только по изменённой строке кода.
 
-- [ ] **Не считать** `knowledge_api_*` маркеры обязательным результатом текущей версии: автоматический self-test отключён после неудачных экспериментов с actor/update точками запуска. `run_knowledge_api_self_test()` пока проверяет только synthetic in-memory claims API и не подтверждает работу игрового сбора наблюдений.
-- [ ] До включения автоматического теста реализовать отдельные проверяемые интеграции: (1) реальный игровой источник события `place_observed`, вызывающий `record_observation()` только после подтверждённого обнаружения/посещения; (2) потребитель `get_companion_world_context()` в логике/диалогах спутника; (3) тест на потерю/сохранение claims после загрузки и перезапуска, когда будет выбран persistent backend.
+- [ ] **Не считать** `knowledge_api_*` маркеры доказательством работы игрового World Model: `run_knowledge_api_self_test()` по-прежнему проверяет синтетические данные в изолированном in-memory хранилище.
+- [x] В экспериментальной ветке `world-model-runtime-observation` добавлена реальная цепочка: online A-Life snapshot компаньона → `observe_companion_location()` → запись фактического уровня и доступного каталогизированного Smart Terrain → `get_companion_world_context()` → проверка, что наблюдение вернулось в known_places. Источник вызывается из `motivator_binder:update()` только для Story ID `gpt_companion_main`; повторный опрос нужен для обнаружения последующих смен уровня/Smart Terrain.
+- [ ] **Не подтверждено в игре:** дождаться маркера `gpt_companion_diag_world_knowledge_runtime_passed`. При первом запуске на Затоне ожидаются `observation_recorded_level_zaton`, `context_read_ok_level_zaton`, `current_level_known_level_zaton`; при уже имеющейся записи допустим `observation_already_known_level_zaton`.
+- [ ] Отдельно подключить knowledge context к решениям/диалогам компаньона: текущая ветка проверяет реальный путь записи и чтения, но ещё не заставляет NPC выбирать поведение на основе известных мест.
+- [ ] Проверить сохранение claims между save/load и перезапусками: текущий backend намеренно остаётся `session_only`, поэтому такая устойчивость пока не реализована.
 
+
+
+## Runtime-проверка World Model (ветка `world-model-runtime-observation`)
+
+Для теста из этой ветки установить в `gamedata/scripts/` два файла: `gpt_world.script` и `xr_motivator.script`. Изменения в `bind_stalker.script` в этой ветке только уточняют комментарии; функционально заменять его не требуется, если уже установлена версия со snapshot-маркерами.
+
+После загрузки сохранения, когда компаньон жив и online на Затоне, проверка выполняется автоматически из motivator binder. В логе должны появиться:
+
+```
+gpt_companion_diag_world_knowledge_runtime_entered
+gpt_companion_diag_world_knowledge_snapshot_online
+gpt_companion_diag_world_knowledge_observation_recorded_level_zaton
+gpt_companion_diag_world_knowledge_context_read_ok_level_zaton
+gpt_companion_diag_world_knowledge_current_level_known_level_zaton
+gpt_companion_diag_world_knowledge_runtime_passed
+gpt_companion_diag_world_knowledge_persistence_session_only
+```
+
+Если уровень уже был отмечен в текущей Lua-сессии, вместо `observation_recorded_level_zaton` допустим `observation_already_known_level_zaton`. Отсутствие назначенного Smart Terrain не мешает проверке уровня. Повторный опрос примерно раз в 15 секунд нужен для записи последующего перехода компаньона на другой уровень или назначения ему Smart Terrain.
+
+`runtime_passed` означает, что движок вернул online-снимок, запись наблюдения прошла через реальный API, а `get_companion_world_context()` прочитал это знание обратно. Этот маркер **не подтверждает** влияние знания на решения NPC и не подтверждает сохранение после загрузки.
