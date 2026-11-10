@@ -1074,8 +1074,8 @@ local function gpt_world_observe_catalog_entity(entity_id, level_id, source_id, 
     return observation, true, nil
 end
 
--- This is the first end-to-end knowledge input: no synthetic test event is used.
--- The source is a real online companion snapshot supplied by X-Ray A-Life.
+-- This is a real runtime input: it uses the online companion's A-Life snapshot,
+-- not a synthetic test event. Call periodically to notice level/terrain changes.
 function gpt_world.observe_companion_location(companion_alife_id, observed_at)
     if type(observed_at) ~= "number" or observed_at < 0 then
         return nil, "invalid_observation_time"
@@ -1117,14 +1117,17 @@ function gpt_world.observe_companion_location(companion_alife_id, observed_at)
         local smart_record = gpt_world.get_catalog_entity(smart_terrain.entity_id)
         if type(smart_record) == "table"
             and smart_record.entity_type == "smart_terrain" then
-            local smart_claim, smart_recorded =
+            local smart_claim, smart_recorded, smart_error =
                 gpt_world_observe_catalog_entity(
                     smart_terrain.entity_id,
                     level_id,
                     source_id,
                     observed_at
                 )
-            if smart_claim ~= nil and smart_recorded then
+            if smart_claim == nil then
+                return nil, "smart_terrain_observation_failed:" .. tostring(smart_error)
+            end
+            if smart_recorded then
                 observations[#observations + 1] = smart_claim
             end
             smart_terrain_id = smart_terrain.entity_id
