@@ -1174,6 +1174,14 @@ function actor_binder:load(reader)
 		self.st.disable_input_time = utils.r_CTime(reader)
 	end
 	xr_logic.pstor_load_all(self.object, reader)
+	local world_load_reset_ok = pcall(function()
+		gpt_world.reset_session_after_actor_load()
+	end)
+	if world_load_reset_ok then
+		gpt_world_snapshot_marker("knowledge_session_cache_reset_after_load")
+	else
+		gpt_world_snapshot_marker("knowledge_session_cache_reset_failed")
+	end
 	self.weather_manager:load(reader)
 	release_body_manager.get_release_body_manager():load(reader)
 --	self.surge_manager:initialize()
