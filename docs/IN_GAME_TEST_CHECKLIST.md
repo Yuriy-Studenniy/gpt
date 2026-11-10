@@ -128,6 +128,32 @@
 
 Проваленный пункт фиксируется с точными шагами воспроизведения и логом. Исправление проверяется по всей связанной цепочке, а не только по изменённой строке кода.
 
-- [ ] **Не считать** `knowledge_api_*` маркеры обязательным результатом текущей версии: автоматический self-test отключён после неудачных экспериментов с actor/update точками запуска. `run_knowledge_api_self_test()` пока проверяет только synthetic in-memory claims API и не подтверждает работу игрового сбора наблюдений.
-- [ ] До включения автоматического теста реализовать отдельные проверяемые интеграции: (1) реальный игровой источник события `place_observed`, вызывающий `record_observation()` только после подтверждённого обнаружения/посещения; (2) потребитель `get_companion_world_context()` в логике/диалогах спутника; (3) тест на потерю/сохранение claims после загрузки и перезапуска, когда будет выбран persistent backend.
+### Проверка World Model — ветка `world-model-completion`
+
+Установить только два файла из этой ветки в `gamedata/scripts/`:
+- `gpt_world.script`
+- `bind_stalker.script`
+
+**Не заменять `xr_motivator.script`**: в этой реализации он не изменён. Штатные follow/combat/update схемы NPC не затрагиваются.
+
+В первом запуске на Затоне, после штатного появления компаньона и до/после его перехода, ожидаются:
+```
+gpt_companion_diag_world_snapshot_knowledge_observation_recorded_level_zaton
+gpt_companion_diag_world_snapshot_knowledge_context_read_ok_level_zaton
+gpt_companion_diag_world_snapshot_knowledge_current_level_persisted_level_zaton
+gpt_companion_diag_world_snapshot_knowledge_runtime_passed
+```
+Если Затон уже был записан в сохранённом мире, допустимо `knowledge_observation_already_known_level_zaton` вместо `knowledge_observation_recorded_level_zaton`.
+
+Затем сохранить игру и загрузить именно это сохранение повторно. В логе после загрузки ожидаются:
+```
+gpt_companion_diag_world_snapshot_knowledge_session_cache_reset_after_load
+gpt_companion_diag_world_snapshot_knowledge_pstor_restore_verified_level_zaton
+gpt_companion_diag_world_snapshot_knowledge_current_level_persisted_level_zaton
+```
+Маркер `knowledge_pstor_restore_verified_<level>` означает, что после восстановления actor PSTOR и очистки Lua-session cache текущий уровень уже присутствовал в сохранённом списке, а не был повторно создан в оперативной памяти.
+
+Для смены уровня опрос выполняется раз в 15 секунд. После фактического online-перехода на Юпитер/Припять ожидается соответствующий `knowledge_observation_recorded_level_jupiter` / `..._level_pripyat`, затем `knowledge_context_read_ok_<level>` и `knowledge_current_level_persisted_<level>`. В текущем follower режиме Smart Terrain может отсутствовать; это допустимо. Если он назначен и разрешается каталогом, он также записывается.
+
+`knowledge_runtime_passed` подтверждает связку snapshot → запись реального наблюдения → PSTOR → чтение context. `knowledge_pstor_restore_verified_<level>` отдельно подтверждает наличие знания после save/load. Эти маркеры **не означают**, что компаньон уже использует географические знания для диалогов/выбора действий, и не означают, что он обнаруживает POI или тайники: автоматического сканирования объектов нет.
 
