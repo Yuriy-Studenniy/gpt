@@ -11,6 +11,7 @@ gpt_world = gpt_world or {}
 
 local GPT_WORLD_COMPANION_STORY_ID = "gpt_companion_main"
 local GPT_WORLD_NO_SMART_TERRAIN_ID = 65535
+local GPT_WORLD_POI_DEFAULT_DISCOVERY_RADIUS = 50
 
 -- These are engine level names found in sim_board.script's
 -- group_id_by_levels mapping. The table is a static catalog, not knowledge.
@@ -491,6 +492,7 @@ local GPT_WORLD_POI_CATALOG = {
         level_id = "level:zaton",
         display_name = "Скадовск",
         category = "stalker_hub",
+        discovery_radius = 50,
         anchor_entity_id = "smart:zaton:zat_stalker_base_smart",
         source_records = { "simulation.ltx:start_position_zaton", "simulation_objects_props.ltx:zat_stalker_base_smart" }
     },
@@ -500,6 +502,7 @@ local GPT_WORLD_POI_CATALOG = {
         level_id = "level:zaton",
         display_name = "Лесничество",
         category = "stalker_base",
+        discovery_radius = 50,
         anchor_entity_id = "smart:zaton:zat_b5_smart_terrain",
         source_records = { "simulation_objects_props.ltx:zat_b5_smart_terrain" }
     },
@@ -509,6 +512,7 @@ local GPT_WORLD_POI_CATALOG = {
         level_id = "level:zaton",
         display_name = "Земснаряд",
         category = "landmark",
+        discovery_radius = 50,
         anchor_entity_id = "smart:zaton:zat_b14_smart_terrain",
         source_records = { "simulation_objects_props.ltx:zat_b14_smart_terrain" }
     },
@@ -518,6 +522,7 @@ local GPT_WORLD_POI_CATALOG = {
         level_id = "level:zaton",
         display_name = "Железный лес",
         category = "landmark",
+        discovery_radius = 50,
         anchor_entity_id = "smart:zaton:zat_b100",
         source_records = { "simulation.ltx:start_position_zaton", "simulation_objects_props.ltx:zat_b100" }
     },
@@ -527,6 +532,7 @@ local GPT_WORLD_POI_CATALOG = {
         level_id = "level:zaton",
         display_name = "Старая баржа",
         category = "hideout",
+        discovery_radius = 50,
         anchor_entity_id = "smart:zaton:zat_b18",
         source_records = { "simulation.ltx:start_position_zaton:zat_b18_noah_squad" }
     }
@@ -1117,6 +1123,7 @@ function gpt_world.record_claim(claim)
         and claim.value == true
         and claim.status == "observed"
         and claim.source_type == "observation"
+        and not GPT_WORLD_PERSISTENCE_SUSPENDED
         and gpt_world.get_catalog_entity(claim.subject_id) ~= nil
 
     if persist_known_place then
@@ -1481,6 +1488,234 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
     }, nil
 end
 
+-- Records a POI knowledge event produced by the bounded proximity detector.
+-- The Smart Terrain anchor is approximate; this means the companion was near
+-- the named place, not that the engine proved line-of-sight or exact visibility.
+function gpt_world.record_poi_proximity_observation(event)
+    if type(event) ~= "table" then
+        return nil, "event_not_table"
+    end
+    if event.event_type ~= "poi_anchor_proximity" then
+        return nil, "unsupported_poi_event"
+    end
+    if event.confirmed ~= true then
+        return nil, "poi_observation_not_confirmed"
+    end
+    if not gpt_world_is_nonempty_string(event.entity_id) then
+        return nil, "invalid_poi_entity_id"
+    end
+
+    local poi = gpt_world.get_catalog_entity(event.entity_id)
+    if type(poi) ~= "table" or poi.entity_type ~= "poi" then
+        return nil, "poi_not_catalogued"
+    end
+    if event.level_id ~= poi.level_id then
+        return nil, "poi_level_mismatch"
+    end
+    if event.anchor_entity_id ~= poi.anchor_entity_id then
+        return nil, "poi_anchor_mismatch"
+    end
+    if type(event.companion_alife_object_id) ~= "number"
+        or event.companion_alife_object_id <= 0 then
+        return nil, "invalid_companion_source_id"
+    end
+    if type(event.distance_squared) ~= "number"
+        or event.distance_squared < 0 then
+        return nil, "invalid_poi_distance"
+    end
+    if type(event.created_at) ~= "number" or event.created_at < 0 then
+        return nil, "invalid_poi_observation_time"
+    end
+
+    local discovery_radius = poi.discovery_radius
+    if type(discovery_radius) ~= "number" or discovery_radius <= 0 then
+        discovery_radius = GPT_WORLD_POI_DEFAULT_DISCOVERY_RADIUS
+    end
+    if event.distance_squared > discovery_radius * discovery_radius then
+        return nil, "outside_poi_discovery_radius"
+    end
+
+    local known_places = gpt_world.get_known_places({ level_id = poi.level_id })
+    for _, place in ipairs(known_places) do
+        if place.entity_id == poi.entity_id and place.known == true then
+            return nil, "poi_already_known"
+        end
+    end
+
+    return gpt_world.record_claim({
+        subject_id = poi.entity_id,
+        level_id = poi.level_id,
+        predicate = "known_place",
+        value = true,
+        status = "observed",
+        source_type = "observation",
+        source_id = "poi_anchor_proximity:companion_"
+            .. tostring(event.companion_alife_object_id)
+            .. ":" .. poi.anchor_entity_id,
+        confidence = 0.85,
+        created_at = event.created_at,
+        last_confirmed_at = event.created_at
+    })
+end
+
+-- Checks only the small, curated POI list for the companion's current level.
+-- Each anchor is resolved by its known Smart Terrain name from sim_board; no
+-- level-wide object iteration, visibility scan, or NPC update hook is involved.
+-- Returns { observations = {}, anchors_checked = N }, nil or nil, stable_error.
+function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_at)
+    if type(companion_alife_id) ~= "number" or companion_alife_id <= 0 then
+        return nil, "invalid_companion_id"
+    end
+    if type(observed_at) ~= "number" or observed_at < 0 then
+        return nil, "invalid_observation_time"
+    end
+
+    local snapshot, snapshot_error = gpt_world.get_companion_location_snapshot(companion_alife_id)
+    if type(snapshot) ~= "table" then
+        return nil, snapshot_error or "companion_snapshot_unavailable"
+    end
+    if snapshot.is_online ~= true then
+        return {
+            observations = {},
+            anchors_checked = 0,
+            skipped_reason = "companion_offline"
+        }, nil
+    end
+
+    local level = snapshot.level
+    if type(level) ~= "table"
+        or type(level.entity_id) ~= "string"
+        or type(level.game_graph_level_id) ~= "number" then
+        return nil, "companion_level_unavailable"
+    end
+
+    local pois = gpt_world.get_catalog_pois(level.entity_id)
+    if #pois == 0 then
+        return {
+            observations = {},
+            anchors_checked = 0,
+            skipped_reason = "no_catalogued_pois"
+        }, nil
+    end
+
+    local online_companion = gpt_world_get_online_companion_object(companion_alife_id)
+    if online_companion == nil then
+        return nil, "companion_online_object_unavailable"
+    end
+    local companion_position = gpt_world_safe_method(online_companion, "position")
+    if companion_position == nil then
+        companion_position = gpt_world_safe_index(online_companion, "position")
+    end
+    if companion_position == nil then
+        return nil, "companion_position_unavailable"
+    end
+
+    local board_api = sim_board
+    local board_getter = gpt_world_safe_index(board_api, "get_sim_board")
+    if type(board_getter) ~= "function" then
+        return nil, "sim_board_api_unavailable"
+    end
+    local board_ok, board = pcall(board_getter)
+    if not board_ok or board == nil then
+        return nil, "sim_board_unavailable"
+    end
+
+    local simulation = gpt_world_get_alife()
+    local graph = gpt_world_get_game_graph()
+    if simulation == nil or graph == nil then
+        return nil, "world_graph_unavailable"
+    end
+
+    local known_places = gpt_world.get_known_places({ level_id = level.entity_id })
+    local known_by_id = {}
+    for _, place in ipairs(known_places) do
+        if place.known == true then
+            known_by_id[place.entity_id] = true
+        end
+    end
+
+    local result = {
+        observations = {},
+        anchors_checked = 0,
+        anchors_unavailable = 0
+    }
+
+    for _, poi in ipairs(pois) do
+        if not known_by_id[poi.entity_id] then
+            local anchor_record = gpt_world.get_catalog_entity(poi.anchor_entity_id)
+            if type(anchor_record) == "table"
+                and anchor_record.entity_type == "smart_terrain"
+                and anchor_record.level_id == level.entity_id then
+                local anchor = gpt_world_safe_method(
+                    board,
+                    "get_smart_by_name",
+                    anchor_record.engine_name
+                )
+                if anchor ~= nil then
+                    local anchor_game_vertex_id = gpt_world_get_game_vertex_id(anchor)
+                    local anchor_vertex = gpt_world_safe_method(
+                        graph,
+                        "vertex",
+                        anchor_game_vertex_id
+                    )
+                    local anchor_level_id = gpt_world_safe_method(anchor_vertex, "level_id")
+                    if type(anchor_level_id) == "number"
+                        and anchor_level_id == level.game_graph_level_id then
+                        local anchor_position = gpt_world_safe_index(anchor, "position")
+                        if anchor_position == nil then
+                            anchor_position = gpt_world_safe_method(anchor, "position")
+                        end
+                        if anchor_position ~= nil then
+                            result.anchors_checked = result.anchors_checked + 1
+                            local distance_squared = gpt_world_safe_method(
+                                companion_position,
+                                "distance_to_sqr",
+                                anchor_position
+                            )
+                            local discovery_radius = poi.discovery_radius
+                            if type(discovery_radius) ~= "number"
+                                or discovery_radius <= 0 then
+                                discovery_radius = GPT_WORLD_POI_DEFAULT_DISCOVERY_RADIUS
+                            end
+
+                            if type(distance_squared) == "number"
+                                and distance_squared >= 0
+                                and distance_squared <= discovery_radius * discovery_radius then
+                                local claim, claim_error =
+                                    gpt_world.record_poi_proximity_observation({
+                                        event_type = "poi_anchor_proximity",
+                                        confirmed = true,
+                                        entity_id = poi.entity_id,
+                                        level_id = poi.level_id,
+                                        anchor_entity_id = poi.anchor_entity_id,
+                                        companion_alife_object_id = companion_alife_id,
+                                        distance_squared = distance_squared,
+                                        created_at = observed_at
+                                    })
+                                if claim ~= nil then
+                                    known_by_id[poi.entity_id] = true
+                                    result.observations[#result.observations + 1] = {
+                                        entity_id = poi.entity_id,
+                                        display_name = poi.display_name,
+                                        anchor_entity_id = poi.anchor_entity_id,
+                                        distance_m = math.sqrt(distance_squared)
+                                    }
+                                elseif claim_error ~= "poi_already_known" then
+                                    result.anchors_unavailable = result.anchors_unavailable + 1
+                                end
+                            end
+                        end
+                    end
+                else
+                    result.anchors_unavailable = result.anchors_unavailable + 1
+                end
+            end
+        end
+    end
+
+    return result, nil
+end
+
 -- Called immediately after actor_binder restores PSTOR from a save.
 -- Drop Lua-session claims so the save-backed list is the sole authority after load.
 function gpt_world.reset_session_after_actor_load()
@@ -1502,6 +1737,10 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         observation_ok = false,
         unconfirmed_observation_rejected_ok = false,
         poi_catalog_ok = false,
+        poi_observation_ok = false,
+        poi_outside_radius_rejected_ok = false,
+        poi_bad_anchor_rejected_ok = false,
+        poi_duplicate_rejected_ok = false,
         provenance_ok = false,
         context_ok = false,
         context_skipped = false,
@@ -1547,7 +1786,9 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         local invalid_anchor = false
         for _, poi in ipairs(zaton_pois) do
             local anchor = gpt_world.get_catalog_entity(poi.anchor_entity_id)
-            if anchor == nil or anchor.entity_type ~= "smart_terrain"
+            if type(poi.discovery_radius) ~= "number"
+                or poi.discovery_radius <= 0
+                or anchor == nil or anchor.entity_type ~= "smart_terrain"
                 or anchor.level_id ~= poi.level_id then
                 invalid_anchor = true
             end
@@ -1697,6 +1938,72 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         end
         result.provenance_ok = true
 
+        local poi_event, poi_event_error = gpt_world.record_poi_proximity_observation({
+            event_type = "poi_anchor_proximity",
+            confirmed = true,
+            entity_id = "poi:zaton:dredger_station",
+            level_id = "level:zaton",
+            anchor_entity_id = "smart:zaton:zat_b14_smart_terrain",
+            companion_alife_object_id = 12345,
+            distance_squared = 100,
+            created_at = 3
+        })
+        if poi_event == nil or poi_event.status ~= "observed"
+            or poi_event.source_type ~= "observation"
+            or poi_event.subject_id ~= "poi:zaton:dredger_station" then
+            error("poi_proximity_observation_invalid:" .. tostring(poi_event_error))
+        end
+        result.poi_observation_ok = true
+
+        local duplicate_poi_event, duplicate_poi_error =
+            gpt_world.record_poi_proximity_observation({
+                event_type = "poi_anchor_proximity",
+                confirmed = true,
+                entity_id = "poi:zaton:dredger_station",
+                level_id = "level:zaton",
+                anchor_entity_id = "smart:zaton:zat_b14_smart_terrain",
+                companion_alife_object_id = 12345,
+                distance_squared = 100,
+                created_at = 3.1
+            })
+        if duplicate_poi_event ~= nil or duplicate_poi_error ~= "poi_already_known" then
+            error("duplicate_poi_event_not_rejected")
+        end
+        result.poi_duplicate_rejected_ok = true
+
+        local outside_radius_poi, outside_radius_error =
+            gpt_world.record_poi_proximity_observation({
+                event_type = "poi_anchor_proximity",
+                confirmed = true,
+                entity_id = "poi:zaton:iron_forest",
+                level_id = "level:zaton",
+                anchor_entity_id = "smart:zaton:zat_b100",
+                companion_alife_object_id = 12345,
+                distance_squared = 1000000,
+                created_at = 3.2
+            })
+        if outside_radius_poi ~= nil
+            or outside_radius_error ~= "outside_poi_discovery_radius" then
+            error("outside_radius_poi_event_not_rejected")
+        end
+        result.poi_outside_radius_rejected_ok = true
+
+        local bad_anchor_poi, bad_anchor_error =
+            gpt_world.record_poi_proximity_observation({
+                event_type = "poi_anchor_proximity",
+                confirmed = true,
+                entity_id = "poi:zaton:old_barge",
+                level_id = "level:zaton",
+                anchor_entity_id = "smart:zaton:zat_b100",
+                companion_alife_object_id = 12345,
+                distance_squared = 100,
+                created_at = 3.3
+            })
+        if bad_anchor_poi ~= nil or bad_anchor_error ~= "poi_anchor_mismatch" then
+            error("bad_anchor_poi_event_not_rejected")
+        end
+        result.poi_bad_anchor_rejected_ok = true
+
         local rejected, reject_error = gpt_world.record_observation({
             event_type = "place_observed",
             confirmed = false,
@@ -1735,7 +2042,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
                 or context.knowledge.persistence ~= "session_only"
                 or type(context.knowledge.known_places) ~= "table"
                 or #context.knowledge.known_places
-                    ~= (test_level_id == "level:zaton" and 4 or 2) then
+                    ~= (test_level_id == "level:zaton" and 5 or 2) then
                 error("world_context_knowledge_mismatch")
             end
             result.context_level_entity_id = context.engine.level.entity_id
@@ -1765,6 +2072,10 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         and result.observation_ok
         and result.unconfirmed_observation_rejected_ok
         and result.poi_catalog_ok
+        and result.poi_observation_ok
+        and result.poi_duplicate_rejected_ok
+        and result.poi_outside_radius_rejected_ok
+        and result.poi_bad_anchor_rejected_ok
         and result.provenance_ok
         and (result.context_ok or result.context_skipped)
 
