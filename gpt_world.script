@@ -1045,6 +1045,14 @@ local function gpt_world_persisted_place_claim(entity_id)
 end
 
 function gpt_world.get_persistence_status(entity_id)
+    if GPT_WORLD_PERSISTENCE_SUSPENDED then
+        return {
+            backend = "session_only",
+            persisted_place_count = 0,
+            contains_entity = false
+        }
+    end
+
     local ids, read_error = gpt_world_read_persisted_place_ids()
     if ids == nil then
         return {
