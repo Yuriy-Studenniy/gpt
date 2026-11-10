@@ -799,6 +799,7 @@ local GPT_WORLD_MAX_CLAIMS = 512
 local GPT_WORLD_PERSISTENCE_KEY = "gpt_world_known_places_v1"
 local GPT_WORLD_MAX_PERSISTED_PLACES = 256
 local GPT_WORLD_PERSISTENCE_SUSPENDED = false
+local GPT_WORLD_PENDING_SAVE_RESTORE_CHECK = false
 
 local GPT_WORLD_CLAIM_STATUSES = {
     observed = true,
@@ -1318,6 +1319,17 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
         return nil, "level_observation_failed:" .. tostring(level_error)
     end
 
+    local save_restore_checked = false
+    local save_restore_verified = false
+    if GPT_WORLD_PENDING_SAVE_RESTORE_CHECK then
+        local restored_status = gpt_world.get_persistence_status(level_id)
+        save_restore_checked = true
+        save_restore_verified = level_new == false
+            and restored_status.backend == "actor_pstor"
+            and restored_status.contains_entity == true
+        GPT_WORLD_PENDING_SAVE_RESTORE_CHECK = false
+    end
+
     local smart_terrain_id = nil
     local smart_terrain = snapshot.smart_terrain
     if type(smart_terrain) == "table"
@@ -1377,6 +1389,8 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
         current_smart_terrain_known = current_smart_terrain_known,
         persistence_backend = persistence_status.backend,
         persisted_place_count = persistence_status.persisted_place_count,
+        save_restore_checked = save_restore_checked,
+        save_restore_verified = save_restore_verified,
         already_known = #recorded == 0
     }, nil
 end
@@ -1387,6 +1401,7 @@ function gpt_world.reset_session_after_actor_load()
     GPT_WORLD_CLAIMS = {}
     GPT_WORLD_NEXT_CLAIM_ID = 1
     GPT_WORLD_PERSISTENCE_SUSPENDED = false
+    GPT_WORLD_PENDING_SAVE_RESTORE_CHECK = true
     return true
 end
 
