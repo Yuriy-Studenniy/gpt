@@ -1,5 +1,5 @@
 --[[
-    GPT World Model - read-only X-Ray adapter
+    GPT World Model - X-Ray adapter and source-aware knowledge store
     Target: S.T.A.L.K.E.R.: Call of Pripyat 1.6.02 / original X-Ray
 
     This module provides a static world catalog, read-only X-Ray snapshots,
