@@ -489,12 +489,13 @@ local function gpt_update_world_knowledge_self_test(binder, now)
 	end
 	if binder.gpt_companion_setup_complete ~= true
 		or binder.gpt_world_snapshot_done ~= true
+		or binder.gpt_world_snapshot_online_confirmed ~= true
 		or binder.gpt_world_module_loaded ~= true then
 		return
 	end
 
 	if binder.gpt_world_knowledge_self_test_due == nil then
-		binder.gpt_world_knowledge_self_test_due = now + 3000
+		binder.gpt_world_knowledge_self_test_due = now + 5000
 		gpt_world_snapshot_marker("knowledge_api_deferred_scheduled")
 		return
 	end
@@ -578,8 +579,9 @@ local function gpt_update_world_snapshot(binder, now)
 	local online_confirmed = snapshot ~= nil and snapshot.is_online == true
 	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
 	if online_confirmed then
-		-- Keep the actor update path limited to the already-validated read-only
-		-- snapshot. Knowledge/context self-tests must never gate companion setup.
+		-- Record the confirmed online state. Deferred self-tests may run only
+		-- after companion setup has also returned successfully.
+		binder.gpt_world_snapshot_online_confirmed = true
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
@@ -689,6 +691,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
+	self.gpt_world_snapshot_online_confirmed = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -728,6 +731,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
+	self.gpt_world_snapshot_online_confirmed = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
@@ -1034,7 +1038,17 @@ function actor_binder:update(delta)
 
 	-- A temporary A-Life failure must not permanently suppress later attempts.
 	gpt_update_companion_setup(self)
-	gpt_update_world_knowledge_self_test(self, time_global())
+	-- A final outer guard ensures an unexpected self-test error cannot escape
+	-- into the actor binder update or affect the already-created companion.
+	local knowledge_probe_call_ok, knowledge_probe_error = pcall(
+		gpt_update_world_knowledge_self_test,
+		self,
+		time_global()
+	)
+	if not knowledge_probe_call_ok then
+		gpt_world_snapshot_marker("knowledge_api_outer_call_failed",
+			string.sub(tostring(knowledge_probe_error), 1, 48))
+	end
 
 	treasure_manager.get_treasure_manager():update()
 
