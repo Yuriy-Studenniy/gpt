@@ -479,7 +479,7 @@ local function gpt_companion_log_world_snapshot(companion_id)
 	return snapshot, nil
 end
 
--- Knowledge self-tests run from the companion's own online motivator binder,
+-- Companion knowledge ingestion runs from its own online motivator binder,
 -- never from the player's actor update or spawn/setup path.
 
 local function gpt_update_world_snapshot(binder, now)
@@ -509,7 +509,7 @@ local function gpt_update_world_snapshot(binder, now)
 	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
 	if online_confirmed then
 		-- Record the confirmed online state. Deferred self-tests may run only
-		-- after companion setup has also returned successfully.
+		-- independently from companion knowledge ingestion in xr_motivator.script.
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
