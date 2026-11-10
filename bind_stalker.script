@@ -483,6 +483,40 @@ end
 -- Run the pure claims/observation API test only after companion setup and
 -- the real online snapshot have completed. This is deliberately delayed and
 -- isolated from the code path that creates/registers the NPC.
+local function gpt_run_live_world_context_probe(companion_id)
+	gpt_world_snapshot_marker("context_probe_entered")
+	local call_ok, context, context_error = pcall(function()
+		return gpt_world.get_companion_world_context(companion_id)
+	end)
+	if not call_ok then
+		gpt_world_snapshot_marker("context_call_failed", string.sub(tostring(context), 1, 56))
+		return false
+	end
+	if type(context) ~= "table" then
+		gpt_world_snapshot_marker("context_unavailable", tostring(context_error or "nil"))
+		return false
+	end
+
+	local engine = context.engine
+	local level = type(engine) == "table" and engine.level or nil
+	if type(level) ~= "table" or type(level.name) ~= "string" then
+		gpt_world_snapshot_marker("context_level_unavailable")
+		return false
+	end
+	gpt_world_snapshot_marker("context_level", level.name)
+	gpt_world_snapshot_marker("context_online", tostring(engine.is_online))
+
+	local knowledge = context.knowledge
+	if engine.is_online ~= true or type(knowledge) ~= "table"
+		or knowledge.persistence ~= "session_only"
+		or type(knowledge.known_places) ~= "table" then
+		gpt_world_snapshot_marker("context_validation_failed")
+		return false
+	end
+	gpt_world_snapshot_marker("context_probe_passed")
+	return true
+end
+
 local function gpt_update_world_knowledge_self_test(binder, now)
 	if binder.gpt_world_knowledge_self_test_done then
 		return
@@ -513,6 +547,21 @@ local function gpt_update_world_knowledge_self_test(binder, now)
 			"level:gpt_world_self_test"
 		)
 	end)
+
+	-- The pure claims test and live engine context are separate checks. Both
+	-- run only after setup + online confirmation, each inside its own pcall.
+	local context_call_ok, context_result = pcall(
+		gpt_run_live_world_context_probe,
+		binder.gpt_world_snapshot_companion_id
+	)
+	if not context_call_ok then
+		gpt_world_snapshot_marker("context_outer_call_failed",
+			string.sub(tostring(context_result), 1, 48))
+	elseif context_result == true then
+		gpt_world_snapshot_marker("context_dispatch_passed")
+	else
+		gpt_world_snapshot_marker("context_dispatch_completed_with_failure")
+	end
 
 	if not call_ok then
 		gpt_world_snapshot_marker("knowledge_api_deferred_call_failed",
