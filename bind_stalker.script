@@ -781,12 +781,13 @@ local function gpt_update_companion_poi_knowledge(binder, now)
 		local scan_detail = tostring(result.anchors_checked or 0)
 			.. "_of_" .. tostring(result.anchors_total)
 			.. "_anchors_unavailable_" .. tostring(result.anchors_unavailable or 0)
-		if binder.gpt_world_poi_scan_signature ~= scan_detail then
+		local scan_signature = level_token .. "_" .. scan_detail
+		if binder.gpt_world_poi_scan_signature ~= scan_signature then
 			gpt_world_snapshot_marker(
 				"knowledge_poi_detector_scan_" .. level_token,
 				scan_detail
 			)
-			binder.gpt_world_poi_scan_signature = scan_detail
+			binder.gpt_world_poi_scan_signature = scan_signature
 		end
 	end
 
