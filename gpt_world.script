@@ -1645,8 +1645,10 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
     local result = {
         level_id = level.entity_id,
         observations = {},
+        anchors_total = #pois,
         anchors_checked = 0,
-        anchors_unavailable = 0
+        anchors_unavailable = 0,
+        observation_failures = 0
     }
 
     for _, poi in ipairs(pois) do
@@ -1710,14 +1712,20 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
                                         distance_m = math.sqrt(distance_squared)
                                     }
                                 elseif claim_error ~= "poi_already_known" then
-                                    result.anchors_unavailable = result.anchors_unavailable + 1
+                                    result.observation_failures = result.observation_failures + 1
                                 end
                             end
+                        else
+                            result.anchors_unavailable = result.anchors_unavailable + 1
                         end
+                    else
+                        result.anchors_unavailable = result.anchors_unavailable + 1
                     end
                 else
                     result.anchors_unavailable = result.anchors_unavailable + 1
                 end
+            else
+                result.anchors_unavailable = result.anchors_unavailable + 1
             end
         end
     end
