@@ -162,16 +162,13 @@ local function gpt_companion_world_marker(name)
 end
 
 local function gpt_companion_update_world_knowledge(npc, binder)
-    if binder.gpt_world_runtime_done then
-        return
-    end
-
     local now = time_global()
     if binder.gpt_world_runtime_retry_at ~= nil
         and now < binder.gpt_world_runtime_retry_at then
         return
     end
-    binder.gpt_world_runtime_retry_at = now + 5000
+    -- Observe periodically so a later level/Smart Terrain change is recorded too.
+    binder.gpt_world_runtime_retry_at = now + 15000
 
     if not binder.gpt_world_runtime_started then
         binder.gpt_world_runtime_started = true
@@ -182,7 +179,8 @@ local function gpt_companion_update_world_knowledge(npc, binder)
         return gpt_world.observe_companion_location(npc:id(), now)
     end)
     if not observe_call_ok then
-        gpt_companion_world_marker("observation_call_exception")
+        local error_token = string.sub(tostring(observed or "unknown"), 1, 48)
+        gpt_companion_world_marker("observation_call_exception_" .. error_token)
         return
     end
     if type(observed) ~= "table" then
@@ -198,24 +196,27 @@ local function gpt_companion_update_world_knowledge(npc, binder)
         gpt_companion_world_marker("observation_result_invalid")
         return
     end
-    gpt_companion_world_marker("snapshot_online")
 
-    if type(observed.observations) == "table"
-        and #observed.observations > 0 then
-        for _, claim in ipairs(observed.observations) do
-            local entity_id = type(claim) == "table" and claim.subject_id or nil
-            local entity_token = string.sub(tostring(entity_id or "unknown"), 1, 48)
-            gpt_companion_world_marker("observation_recorded_" .. entity_token)
-        end
-    else
-        gpt_companion_world_marker("observation_already_known")
+    local verified_levels = binder.gpt_world_runtime_verified_levels
+    if type(verified_levels) ~= "table" then
+        verified_levels = {}
+        binder.gpt_world_runtime_verified_levels = verified_levels
     end
+
+    local has_new_observations = type(observed.observations) == "table"
+        and #observed.observations > 0
+    if verified_levels[level_id] and not has_new_observations then
+        return
+    end
+
+    gpt_companion_world_marker("snapshot_online")
 
     local context_call_ok, context, context_error = pcall(function()
         return gpt_world.get_companion_world_context(npc:id())
     end)
     if not context_call_ok or type(context) ~= "table" then
-        gpt_companion_world_marker("context_read_failed")
+        local error_token = string.sub(tostring(context or context_error or "unknown"), 1, 48)
+        gpt_companion_world_marker("context_read_failed_" .. error_token)
         return
     end
     if type(context.engine) ~= "table"
@@ -228,27 +229,48 @@ local function gpt_companion_update_world_knowledge(npc, binder)
         return
     end
 
-    local current_level_known = false
+    local known_entities = {}
     for _, place in ipairs(context.knowledge.known_places) do
-        if type(place) == "table" and place.entity_id == level_id
-            and place.known == true then
-            current_level_known = true
-            break
+        if type(place) == "table" and place.known == true then
+            known_entities[place.entity_id] = true
         end
     end
-    if not current_level_known then
+    if not known_entities[level_id] then
         gpt_companion_world_marker("current_level_missing_from_context")
         return
     end
 
-    binder.gpt_world_runtime_level_id = level_id
-    binder.gpt_world_runtime_done = true
-    gpt_companion_world_marker("context_read_ok")
-    gpt_companion_world_marker("current_level_known")
-    if context.knowledge.persistence == "session_only" then
+    if has_new_observations then
+        for _, claim in ipairs(observed.observations) do
+            local entity_id = type(claim) == "table" and claim.subject_id or nil
+            if type(entity_id) ~= "string" or not known_entities[entity_id] then
+                local error_token = string.sub(tostring(entity_id or "unknown"), 1, 48)
+                gpt_companion_world_marker("observation_missing_from_context_" .. error_token)
+                return
+            end
+            local entity_token = string.sub(entity_id, 1, 48)
+            gpt_companion_world_marker("observation_recorded_" .. entity_token)
+        end
+    elseif not verified_levels[level_id] then
+        local level_token = string.sub(level_id, 1, 48)
+        gpt_companion_world_marker("observation_already_known_" .. level_token)
+    end
+
+    verified_levels[level_id] = true
+    binder.gpt_world_runtime_last_level_id = level_id
+    local level_token = string.sub(level_id, 1, 48)
+    gpt_companion_world_marker("context_read_ok_" .. level_token)
+    gpt_companion_world_marker("current_level_known_" .. level_token)
+
+    if not binder.gpt_world_runtime_ever_passed then
+        binder.gpt_world_runtime_ever_passed = true
+        gpt_companion_world_marker("runtime_passed")
+    end
+    if context.knowledge.persistence == "session_only"
+        and not binder.gpt_world_runtime_session_only_logged then
+        binder.gpt_world_runtime_session_only_logged = true
         gpt_companion_world_marker("persistence_session_only")
     end
-    gpt_companion_world_marker("runtime_passed")
 end
 
 class "motivator_binder" (object_binder)
