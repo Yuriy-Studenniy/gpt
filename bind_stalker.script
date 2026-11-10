@@ -721,6 +721,73 @@ local function gpt_update_companion_world_knowledge(binder, now)
 	end
 end
 
+-- Low-rate proximity detector for the five curated Zaton POIs.
+-- Runs in the actor binder only; it never enters an NPC update or calls an LLM.
+local function gpt_update_companion_poi_knowledge(binder, now)
+	if binder.gpt_companion_setup_complete ~= true
+		or binder.gpt_world_module_loaded ~= true
+		or binder.gpt_world_snapshot_companion_id == nil then
+		return
+	end
+
+	if binder.gpt_world_poi_next_check_at ~= nil
+		and now < binder.gpt_world_poi_next_check_at then
+		return
+	end
+	binder.gpt_world_poi_next_check_at = now + 5000
+
+	local companion_id = binder.gpt_world_snapshot_companion_id
+	local call_ok, result, detector_error = pcall(function()
+		return gpt_world.observe_companion_poi_proximity(
+			companion_id,
+			now / 1000
+		)
+	end)
+
+	if not call_ok or type(result) ~= "table" then
+		local error_text = call_ok and tostring(detector_error or "unknown") or tostring(result)
+		local error_token = string.sub(string.gsub(error_text, "[^%w_]", "_"), 1, 64)
+		if binder.gpt_world_poi_last_error ~= error_token then
+			binder.gpt_world_poi_last_error = error_token
+			gpt_world_snapshot_marker("knowledge_poi_detector_unavailable", error_token)
+			printf("[GPT_WORLD] POI detector unavailable: %s", error_text)
+		end
+		return
+	end
+	binder.gpt_world_poi_last_error = nil
+
+	if not binder.gpt_world_poi_detector_ready_logged
+		and type(result.anchors_checked) == "number"
+		and result.anchors_checked > 0 then
+		local level_token = string.sub(
+			string.gsub(tostring(result.level_id or "unknown"), "[^%w_]", "_"),
+			1,
+			48
+		)
+		gpt_world_snapshot_marker(
+			"knowledge_poi_detector_ready_" .. level_token,
+			tostring(result.anchors_checked)
+		)
+		binder.gpt_world_poi_detector_ready_logged = true
+	end
+
+	if type(result.observations) == "table" then
+		for _, poi in ipairs(result.observations) do
+			local poi_token = string.sub(
+				string.gsub(tostring(poi.entity_id or "unknown"), "[^%w_]", "_"),
+				1,
+				56
+			)
+			gpt_world_snapshot_marker("knowledge_poi_observed_" .. poi_token)
+			printf(
+				"[GPT_WORLD] Companion learned POI %s (distance %.1fm)",
+				tostring(poi.display_name or poi.entity_id),
+				type(poi.distance_m) == "number" and poi.distance_m or -1
+			)
+		end
+	end
+end
+
 class "actor_binder" (object_binder)
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:__init (obj) super(obj)
@@ -746,6 +813,9 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_snapshot_done = false
 	self.gpt_world_module_loaded = false
 	self.gpt_world_knowledge_retry_at = nil
+	self.gpt_world_poi_next_check_at = nil
+	self.gpt_world_poi_detector_ready_logged = false
+	self.gpt_world_poi_last_error = nil
 	self.gpt_world_knowledge_verified_levels = {}
 	self.gpt_world_knowledge_runtime_passed = false
 end
@@ -786,6 +856,9 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_snapshot_done = false
 	self.gpt_world_module_loaded = false
 	self.gpt_world_knowledge_retry_at = nil
+	self.gpt_world_poi_next_check_at = nil
+	self.gpt_world_poi_detector_ready_logged = false
+	self.gpt_world_poi_last_error = nil
 	self.gpt_world_knowledge_verified_levels = {}
 	self.gpt_world_knowledge_runtime_passed = false
 	benchmark.main()							          --' Distemper 06.2008 --
@@ -1101,6 +1174,13 @@ function actor_binder:update(delta)
 	if not world_knowledge_call_ok then
 		gpt_world_snapshot_marker("knowledge_update_outer_failed")
 		printf("[GPT_WORLD] Knowledge update failed safely: %s", tostring(world_knowledge_error))
+	end
+
+	local poi_knowledge_call_ok, poi_knowledge_error =
+		pcall(gpt_update_companion_poi_knowledge, self, time_global())
+	if not poi_knowledge_call_ok then
+		gpt_world_snapshot_marker("knowledge_poi_update_outer_failed")
+		printf("[GPT_WORLD] POI knowledge update failed safely: %s", tostring(poi_knowledge_error))
 	end
 
 	treasure_manager.get_treasure_manager():update()
