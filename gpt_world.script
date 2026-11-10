@@ -962,18 +962,31 @@ local function gpt_world_persisted_place_claim(entity_id)
     }
 end
 
-function gpt_world.get_persistence_status()
+function gpt_world.get_persistence_status(entity_id)
     local ids, read_error = gpt_world_read_persisted_place_ids()
     if ids == nil then
         return {
             backend = "unavailable",
             persisted_place_count = 0,
+            contains_entity = false,
             error = read_error
         }
     end
+
+    local contains_entity = entity_id == nil
+    if entity_id ~= nil then
+        for _, persisted_id in ipairs(ids) do
+            if persisted_id == entity_id then
+                contains_entity = true
+                break
+            end
+        end
+    end
+
     return {
         backend = "actor_pstor",
-        persisted_place_count = #ids
+        persisted_place_count = #ids,
+        contains_entity = contains_entity
     }
 end
 
@@ -1227,7 +1240,7 @@ function gpt_world.get_companion_world_context(companion_alife_id, snapshot_over
         level_id = level_id
     })
     local all_known_places = gpt_world.get_known_places()
-    local persistence_status = gpt_world.get_persistence_status()
+    local persistence_status = gpt_world.get_persistence_status(level_id)
 
     return {
         engine = snapshot,
@@ -1235,7 +1248,8 @@ function gpt_world.get_companion_world_context(companion_alife_id, snapshot_over
             known_places = known_places,
             all_known_places = all_known_places,
             persistence = persistence_status.backend,
-            persisted_place_count = persistence_status.persisted_place_count
+            persisted_place_count = persistence_status.persisted_place_count,
+            current_level_persisted = persistence_status.contains_entity == true
         },
         source = "gpt_world_context"
     }, nil
@@ -1315,7 +1329,7 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
         end
     end
 
-    local persistence_status = gpt_world.get_persistence_status()
+    local persistence_status = gpt_world.get_persistence_status(level_id)
     local known_places = gpt_world.get_known_places({
         level_id = level_id
     })
@@ -1337,11 +1351,18 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
     if not current_smart_terrain_known then
         return nil, "smart_terrain_not_returned_by_knowledge_query"
     end
-    if persistence_status.backend ~= "actor_pstor" then
-        return nil, "persistent_backend_unavailable:"
+    if persistence_status.backend ~= "actor_pstor"
+        or persistence_status.contains_entity ~= true then
+        return nil, "current_level_not_persisted:"
             .. tostring(persistence_status.error or persistence_status.backend)
     end
-
+    if smart_terrain_id ~= nil then
+        local smart_persistence = gpt_world.get_persistence_status(smart_terrain_id)
+        if smart_persistence.backend ~= "actor_pstor"
+            or smart_persistence.contains_entity ~= true then
+            return nil, "current_smart_terrain_not_persisted"
+        end
+    end
     return {
         snapshot = snapshot,
         current_level_id = level_id,
