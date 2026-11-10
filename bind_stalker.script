@@ -406,7 +406,7 @@ local function gpt_world_log_module_status(binder)
 
 	gpt_companion_diagnostic("world_module_loaded_levels_" .. tostring(#levels))
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
-
+	binder.gpt_world_module_loaded = true
 end
 
 -- Retail X-Ray's reliable diagnostic channel in this project is a harmless
@@ -480,8 +480,77 @@ local function gpt_companion_log_world_snapshot(companion_id)
 	return snapshot, nil
 end
 
--- Claims API self-test remains available in gpt_world.script but is not
--- executed from actor_binder:update; keeping the spawn path free of test work.
+-- Run the pure claims/observation API test only after companion setup and
+-- the real online snapshot have completed. This is deliberately delayed and
+-- isolated from the code path that creates/registers the NPC.
+local function gpt_update_world_knowledge_self_test(binder, now)
+	if binder.gpt_world_knowledge_self_test_done then
+		return
+	end
+	if binder.gpt_companion_setup_complete ~= true
+		or binder.gpt_world_snapshot_done ~= true
+		or binder.gpt_world_module_loaded ~= true then
+		return
+	end
+
+	if binder.gpt_world_knowledge_self_test_due == nil then
+		binder.gpt_world_knowledge_self_test_due = now + 3000
+		gpt_world_snapshot_marker("knowledge_api_deferred_scheduled")
+		return
+	end
+	if now < binder.gpt_world_knowledge_self_test_due then
+		return
+	end
+
+	-- Set the guard before invoking Lua code: a failure can never retry every tick.
+	binder.gpt_world_knowledge_self_test_done = true
+	gpt_world_snapshot_marker("knowledge_api_deferred_entered")
+
+	local call_ok, results, error_code = pcall(function()
+		return gpt_world.run_knowledge_api_self_test(
+			nil,
+			"level:gpt_world_self_test"
+		)
+	end)
+
+	if not call_ok then
+		gpt_world_snapshot_marker("knowledge_api_deferred_call_failed",
+			string.sub(tostring(results), 1, 56))
+		return
+	end
+	if type(results) ~= "table" then
+		gpt_world_snapshot_marker("knowledge_api_deferred_no_result",
+			tostring(error_code or "nil"))
+		return
+	end
+
+	local checks = {
+		"claim_write_ok",
+		"claim_read_ok",
+		"known_places_ok",
+		"observation_ok",
+		"unconfirmed_observation_rejected_ok"
+	}
+	for _, check_name in ipairs(checks) do
+		if results[check_name] == true then
+			gpt_world_snapshot_marker("knowledge_api_" .. check_name)
+		else
+			gpt_world_snapshot_marker("knowledge_api_" .. check_name .. "_failed")
+		end
+	end
+
+	if results.context_skipped == true then
+		gpt_world_snapshot_marker("knowledge_api_context_skipped")
+	end
+	if results.probe_passed == true then
+		gpt_world_snapshot_marker("knowledge_api_probe_passed")
+		gpt_world_snapshot_marker("knowledge_api_deferred_passed")
+	else
+		local detail = results.error or error_code or "assertion"
+		gpt_world_snapshot_marker("knowledge_api_error", string.sub(tostring(detail), 1, 56))
+		gpt_world_snapshot_marker("knowledge_api_probe_failed")
+	end
+end
 
 local function gpt_update_world_snapshot(binder, now)
 	local companion_id = binder.gpt_world_snapshot_companion_id
@@ -613,6 +682,9 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
 	self.gpt_world_module_checked = false
+	self.gpt_world_module_loaded = false
+	self.gpt_world_knowledge_self_test_due = nil
+	self.gpt_world_knowledge_self_test_done = false
 	self.gpt_world_snapshot_companion_id = nil
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
@@ -649,6 +721,9 @@ function actor_binder:net_spawn(data)
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
 	self.gpt_world_module_checked = false
+	self.gpt_world_module_loaded = false
+	self.gpt_world_knowledge_self_test_due = nil
+	self.gpt_world_knowledge_self_test_done = false
 	self.gpt_world_snapshot_companion_id = nil
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
@@ -959,6 +1034,7 @@ function actor_binder:update(delta)
 
 	-- A temporary A-Life failure must not permanently suppress later attempts.
 	gpt_update_companion_setup(self)
+	gpt_update_world_knowledge_self_test(self, time_global())
 
 	treasure_manager.get_treasure_manager():update()
 
