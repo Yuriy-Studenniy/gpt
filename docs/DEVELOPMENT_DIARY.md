@@ -783,3 +783,12 @@
 - Это runtime-подтверждение, что спутник снова доступен как online A-Life object и location snapshot завершается за одну попытку после rollback. Отсутствие Smart Terrain штатно и не блокирует завершение.
 - Knowledge API self-test остаётся доступным в `gpt_world.script`, но автоматический запуск не возвращать в actor update. Следующий дизайн должен использовать отдельный отложенный/debug entry point, вызываемый вне critical spawn path.
 - Визуальное присутствие/следование NPC и полный регрессионный прогон этим фрагментом не подтверждены.
+
+## 2026-11-10 — Отложенный knowledge API self-test после успешного spawn
+
+- Возврат к простому snapshot-only пути подтвердился пользовательским логом: `online_true`, `read_ok`, `online_gate_true`, `polling_complete`. Создание и первичная настройка спутника снова имеют приоритет.
+- Чтобы всё же проверить claims API без повторения прошлой регрессии, запуск перенесён за точку успешного завершения `gpt_update_companion_setup()`. Тест ждёт четыре условия: `gpt_companion_setup_complete`, `gpt_world_snapshot_done`, `gpt_world_snapshot_online_confirmed`, `gpt_world_module_loaded`; после их выполнения выдерживает ещё 5 секунд.
+- Core self-test вызывается с `nil` companion ID и synthetic `level:gpt_world_self_test`: он проверяет только временное claims/observation хранилище и не вызывает X-Ray snapshot. Исходная claim table и sequence ID восстанавливаются самой функцией теста.
+- Реальный `get_companion_world_context(companion_id)` проверяется отдельно после тех же условий. Core test и context probe имеют отдельные `pcall`, весь диспетчер тоже обёрнут в `pcall`; one-shot guard устанавливается перед вызовами. Поэтому тест не предшествует spawn и не повторяется в каждом кадре.
+- Диагностика остаётся на проверенном retail console marker канале. Ожидаемые новые маркеры: `knowledge_api_deferred_scheduled`, `knowledge_api_deferred_entered`, `knowledge_api_probe_passed`, `knowledge_api_deferred_passed`, а для live context — `context_probe_entered`, `context_probe_passed`, `context_dispatch_passed`.
+- Изменён только `bind_stalker.script`; `gpt_world.script` уже содержит изолированный self-test API. Структурная проверка блоков и скобок обоих Lua-файлов прошла. Lua-компилятор и целевой игровой runtime здесь недоступны; новая отложенная проверка пока не подтверждена в игре.
