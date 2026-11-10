@@ -178,7 +178,7 @@ gpt_companion_diag_world_snapshot_knowledge_current_level_persisted_level_zaton
 
 В `gpt_world.script` добавлен статический seed из пяти POI Затона:
 - Скадовск — `poi:zaton:skadovsk`
-- Станция рейнджеров — `poi:zaton:ranger_station`
+- Лесничество — `poi:zaton:ranger_station`
 - Земснаряд — `poi:zaton:dredger_station`
 - Железный лес — `poi:zaton:iron_forest`
 - Старая баржа — `poi:zaton:old_barge`

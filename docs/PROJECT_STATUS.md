@@ -136,7 +136,7 @@
 
 Первый модуль — корневой файл `gpt_world.script`. В ветке `world-model-completion` подготовлена следующая реализация:
 
-- Статический каталог из 5 engine level names, 53 Smart Terrain/A-Life назначений и 5 курируемых именованных POI Затона (Скадовск, Станция рейнджеров, Земснаряд, Железный лес, Старая баржа). POI ссылаются на Smart Terrain как на грубые якоря, без координат и геометрии обнаружения.
+- Статический каталог из 5 engine level names, 53 Smart Terrain/A-Life назначений и 5 курируемых именованных POI Затона (Скадовск, Лесничество, Земснаряд, Железный лес, Старая баржа). POI ссылаются на Smart Terrain как на грубые якоря, без координат и геометрии обнаружения.
 - `get_companion_location_snapshot()` — read-only снимок текущего уровня, online-состояния и назначенного Smart Terrain уникального спутника.
 - `record_companion_location_observation()` — принимает только реальный online snapshot со Story ID `gpt_companion_main` и записывает уровень, а также каталогизированный Smart Terrain, только если он действительно назначен.
 - `get_catalog_pois()` — чтение курируемого справочника POI; `get_catalog_entity()` также разрешает POI. `get_known_places()` прикладывает компактные метаданные места только к сущностям с положительным claim. `record_claim()` сохраняет различие `observed/reported/inferred`, источник и уверенность; `get_claims()`, `record_observation()` и `get_companion_world_context()` сохраняют разделение фактов движка и знания персонажа.

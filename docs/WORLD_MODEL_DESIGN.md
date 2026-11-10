@@ -156,12 +156,12 @@ Smart Terrain не следует автоматически считать по
 | POI ID | Отображаемое имя | Грубый A-Life-якорь |
 |---|---|---|
 | `poi:zaton:skadovsk` | Скадовск | `smart:zaton:zat_stalker_base_smart` |
-| `poi:zaton:ranger_station` | Станция рейнджеров | `smart:zaton:zat_b5_smart_terrain` |
+| `poi:zaton:ranger_station` | Лесничество (станция рейнджеров) | `smart:zaton:zat_b5_smart_terrain` |
 | `poi:zaton:dredger_station` | Земснаряд | `smart:zaton:zat_b14_smart_terrain` |
 | `poi:zaton:iron_forest` | Железный лес | `smart:zaton:zat_b100` |
 | `poi:zaton:old_barge` | Старая баржа | `smart:zaton:zat_b18` |
 
-Это **частичный ручной seed**, а не полный список точек Затона. Названия и соответствие Smart Terrain сверены по названиям A-Life-узлов в исходных конфигурациях и доступным картографическим/моддинговым справочникам: [Steam Community — Smart Terrain IDs around Skadovsk](https://steamcommunity.com/app/41700/discussions/0/1636417520560899497/) и [карта локаций Затона](https://www.playground.ru/stalker_callofpripyat/guide/s_t_a_l_k_e_r_callofpripyat_lokatsii_zaton-1203901). Названия являются рабочими понятными метками, а не гарантией точной локализации или геометрии. Якорь обозначает связанную A-Life-зону; он не доказывает, что спутник лично увидел конкретный POI.
+Это **частичный ручной seed**, а не полный список точек Затона. Названия и соответствие Smart Terrain сверены по названиям A-Life-узлов в исходных конфигурациях и доступным картографическим/моддинговым справочникам: [Steam Community — Smart Terrain IDs around Skadovsk](https://steamcommunity.com/app/41700/discussions/0/1636417520560899497/) и [карта локаций Затона](https://www.playground.ru/stalker_call_of_pripyat/guide/s_t_a_l_k_e_r_call_of_pripyat_lokatsii_zaton-1203901). Названия являются рабочими понятными метками, а не гарантией точной локализации или геометрии. Якорь обозначает связанную A-Life-зону; он не доказывает, что спутник лично увидел конкретный POI.
 
 Адаптер местоположения:
 - ищет уникального компаньона через штатный **get_story_object_id("gpt_companion_main")**;
