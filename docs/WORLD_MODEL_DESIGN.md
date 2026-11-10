@@ -175,17 +175,20 @@ Smart Terrain не следует автоматически считать по
 
 Текущее событие открытия места намеренно ограничено уровнем, на котором компаньон реально находится online, и каталогизированным Smart Terrain, если он назначен. Это не сканирование POI, тайников или объектов на всём уровне: для них позднее потребуются отдельные подтверждённые игровые источники обнаружения. Потребитель API в решениях/диалогах также остаётся следующим слоем Character Core; текущий шаг обеспечивает достоверную запись, чтение и сохранение географического знания.
 
-Файл добавлен в установочный список как **gamedata/scripts/gpt_world.script**. Он не зарегистрирован в **modules.script** и не является NPC-схемой. Сам snapshot — только объективный контекст движка; в систему знаний он автоматически не записывается.
+Файл добавлен в установочный список как **gamedata/scripts/gpt_world.script**. Он не зарегистрирован в **modules.script** и не является NPC-схемой. Сам snapshot остаётся read-only фактом движка; отдельный вызов **record_companion_location_observation()** из actor binder решает, какие подтверждённые факты добавить в слой знаний.
 
 Публичный контракт будущего доменного API (имена предварительные):
 - **get_catalog_levels()** / **get_catalog_entity(entity_id)** — read-only справочник уровней и сущностей;
 - **get_catalog_smart_terrains(level_entity_id)** — read-only справочник 53 Smart Terrain/A-Life адресов;
 - **get_companion_location_snapshot(companion_alife_id?)** — read-only источник объективного текущего местоположения; принимает известный A-Life ID или разрешает уникального спутника по Story ID;
-- **record_claim(claim)** — добавляет явное утверждение с provenance/confidence и необязательным `level_id` для POI без каталожной записи; текущий backend ограничен памятью Lua-сессии, лимит 512 claims;
+- **record_claim(claim)** — добавляет явное утверждение с provenance/confidence и необязательным `level_id` для POI без каталожной записи; положительные observed claims по каталогизированным сущностям также попадают в ограниченный actor PSTOR bridge, прочие claims остаются session-only; лимит session claims — 512;
 - **get_claims(subject_id, predicate)** — возвращает копии утверждений, не раскрывая внутреннюю таблицу;
 - **get_known_places(filters)** — возвращает только сущности с положительным `known_place` claim; каталог сам по себе не открывает места;
 - **record_observation(event)** — принимает только явно подтверждённое событие `place_observed` (с `level_id`, если место ещё не внесено в каталог) и создаёт claim со статусом `observed`;
-- **get_companion_world_context(companion_alife_id?)** — возвращает раздельные поля `engine` (текущие факты X-Ray) и `knowledge` (только явные claims).
+- **record_companion_location_observation(snapshot, observed_at)** — принимает только online snapshot уникального компаньона, записывает фактически посещённый уровень и назначенный каталогизированный Smart Terrain;
+- **get_companion_world_context(companion_alife_id?, snapshot_override?)** — возвращает раздельные поля `engine` (текущие факты X-Ray) и `knowledge` (явные claims), плюс current/all known places и состояние persistence;
+- **get_persistence_status(entity_id?)** — показывает backend и проверяет, есть ли конкретный ID в save-backed списке;
+- **reset_session_after_actor_load()** — сбрасывает временный Lua claims cache после восстановления actor PSTOR из сохранения.
 - **run_knowledge_api_self_test(companion_alife_id?, test_level_id_override?)** — диагностическая функция: проверяет public claims/observation API на временном изолированном хранилище и восстанавливает исходную таблицу и sequence ID даже после ошибки. При переданном synthetic `test_level_id_override` core-тест не зависит от A-Life snapshot; engine context проверяется отдельным вызовом после подтверждённого spawn/online. Не предназначена для игрового диалога.
 
 У API должно быть явное разделение catalog и knowledge. Функция, возвращающая каталог, не должна использоваться LLM как перечень уже известных персонажу мест.
