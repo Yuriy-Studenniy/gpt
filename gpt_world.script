@@ -1288,6 +1288,11 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
         local existing = gpt_world.get_claims(entity_id, "known_place")
         for _, claim in ipairs(existing) do
             if claim.value == true then
+                local persist_ok, persist_error =
+                    gpt_world_persist_known_place(entity_id)
+                if not persist_ok then
+                    return false, false, persist_error
+                end
                 return true, false, nil
             end
         end
