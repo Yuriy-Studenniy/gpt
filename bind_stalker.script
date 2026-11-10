@@ -756,6 +756,21 @@ local function gpt_update_companion_poi_knowledge(binder, now)
 	end
 	binder.gpt_world_poi_last_error = nil
 
+	if type(result.restored_pois) == "table" then
+		for _, poi in ipairs(result.restored_pois) do
+			local entity_id = tostring(poi.entity_id or "unknown")
+			if binder.gpt_world_poi_restore_logged[entity_id] ~= true then
+				local poi_token = string.sub(
+					string.gsub(entity_id, "[^%w_]", "_"),
+					1,
+					56
+				)
+				gpt_world_snapshot_marker("knowledge_poi_pstor_restore_verified_" .. poi_token)
+				binder.gpt_world_poi_restore_logged[entity_id] = true
+			end
+		end
+	end
+
 	if not binder.gpt_world_poi_scan_logged
 		and type(result.anchors_total) == "number"
 		and result.anchors_total > 0 then
@@ -819,6 +834,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_poi_next_check_at = nil
 	self.gpt_world_poi_scan_logged = false
 	self.gpt_world_poi_last_error = nil
+	self.gpt_world_poi_restore_logged = {}
 	self.gpt_world_knowledge_verified_levels = {}
 	self.gpt_world_knowledge_runtime_passed = false
 end
@@ -862,6 +878,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_poi_next_check_at = nil
 	self.gpt_world_poi_scan_logged = false
 	self.gpt_world_poi_last_error = nil
+	self.gpt_world_poi_restore_logged = {}
 	self.gpt_world_knowledge_verified_levels = {}
 	self.gpt_world_knowledge_runtime_passed = false
 	benchmark.main()							          --' Distemper 06.2008 --
