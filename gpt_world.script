@@ -1636,14 +1636,28 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
 
     local known_places = gpt_world.get_known_places({ level_id = level.entity_id })
     local known_by_id = {}
+    local restored_pois = {}
     for _, place in ipairs(known_places) do
         if place.known == true then
             known_by_id[place.entity_id] = true
+            if place.catalog ~= nil and place.catalog.entity_type == "poi"
+                and type(place.claims) == "table" then
+                for _, claim in ipairs(place.claims) do
+                    if claim.source_id == "actor_pstor_restore" then
+                        restored_pois[#restored_pois + 1] = {
+                            entity_id = place.entity_id,
+                            display_name = place.catalog.display_name
+                        }
+                        break
+                    end
+                end
+            end
         end
     end
 
     local result = {
         level_id = level.entity_id,
+        restored_pois = restored_pois,
         observations = {},
         anchors_total = #pois,
         anchors_checked = 0,
