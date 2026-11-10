@@ -801,3 +801,11 @@
 - Core claims/observation self-test использует synthetic `level:gpt_world_self_test` и не вызывает A-Life. Затем отдельный read-only вызов `get_companion_world_context(object_id)` проверяет реальный уровень/online и структуру knowledge.
 - Внешний вызов теста, core API и context API защищены `pcall`; одноразовый guard ставится до запуска, поэтому ошибка не должна прерывать update и не повторяется каждый кадр.
 - Пользователю нужно заменить `bind_stalker.script` и `xr_motivator.script`; `gpt_world.script` не менялся. Структурные проверки блоков и скобок этих Lua-файлов прошли; компиляция и runtime в оригинальном CoP ещё не подтверждены.
+
+## 2026-11-10 — Коррекция статуса World Model после ревизии end-to-end
+
+- Перепроверка показала, что диагностический self-test не равен работающей модели знаний. `run_knowledge_api_self_test()` создаёт synthetic claims и synthetic observation внутри временного хранилища; он не проверяет сбор реальных событий из игры.
+- В проверенных игровых точках (`xr_companion.script`, `xr_dialogs.script`, `dialog_manager.script`, level/restrictor binders) не обнаружено подключения `record_observation()` или потребителя `get_companion_world_context()`. Нельзя заявлять, что спутник уже накапливает знания или использует их в диалогах.
+- Экспериментальный diagnostic helper из `xr_motivator.script` откачен; файл возвращён к базовой версии. `bind_stalker.script` оставлен в snapshot-only варианте без автоматического claims self-test.
+- В последнем пользовательском логе snapshot-последовательность оборвалась после `smart_status_no_smart_terrain_assigned`, без `read_ok` и `polling_complete`. Ранее полный snapshot-лог был получен, поэтому прошлый успех не отменяется, но текущий прогон считать успешным нельзя.
+- Исправлены `PROJECT_STATUS.md`, `WORLD_MODEL_DESIGN.md` и `IN_GAME_TEST_CHECKLIST.md`: фактический статус — каталог + адаптер snapshot + изолированный session-only claims API; реальные игровые наблюдения, потребление знаний логикой NPC и persistence пока не реализованы/не подтверждены.
