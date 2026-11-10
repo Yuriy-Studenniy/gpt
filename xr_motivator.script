@@ -108,7 +108,7 @@ local function gpt_try_companion_consumption(npc)
 		return false
 	end
 
-	if npc == nil or npc:alive() ~= true then
+	if npc == nil or not npc:alive() then
 		return false
 	end
 
