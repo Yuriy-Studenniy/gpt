@@ -792,3 +792,12 @@
 - Реальный `get_companion_world_context(companion_id)` проверяется отдельно после тех же условий. Core test и context probe имеют отдельные `pcall`, весь диспетчер тоже обёрнут в `pcall`; one-shot guard устанавливается перед вызовами. Поэтому тест не предшествует spawn и не повторяется в каждом кадре.
 - Диагностика остаётся на проверенном retail console marker канале. Ожидаемые новые маркеры: `knowledge_api_deferred_scheduled`, `knowledge_api_deferred_entered`, `knowledge_api_probe_passed`, `knowledge_api_deferred_passed`, а для live context — `context_probe_entered`, `context_probe_passed`, `context_dispatch_passed`.
 - Изменён только `bind_stalker.script`; `gpt_world.script` уже содержит изолированный self-test API. Структурная проверка блоков и скобок обоих Lua-файлов прошла. Lua-компилятор и целевой игровой runtime здесь недоступны; новая отложенная проверка пока не подтверждена в игре.
+
+## 2026-11-10 — Перенос runtime self-test в online binder компаньона
+
+- Последний пользовательский лог заканчивался на `smart_status_no_smart_terrain_assigned`, не содержал `read_ok`, `snapshot_call_returned_true` и `polling_complete`, а затем показывал `Disconnect / Destroying level`. Следовательно, отложенная actor-side проверка не имела подтверждённого повода запускаться; прежняя архитектура по-прежнему зависела от полного прохода actor binder/snapshot.
+- Из `bind_stalker.script` удалены все автоматические core/context self-test вызовы и тестовые флаги. Файл возвращён к безопасной схеме: World Model lazy-load, read-only snapshot и обычный companion setup.
+- Одноразовый self-test перенесён в `xr_motivator.script`, в `motivator_binder:update()` конкретного NPC. Триггер использует уже существующий рабочий фильтр Story ID `gpt_companion_main`, требует живой online объект и ждёт 5 секунд после первого обновления его binder. Обычные NPC не проходят тестовую ветку.
+- Core claims/observation self-test использует synthetic `level:gpt_world_self_test` и не вызывает A-Life. Затем отдельный read-only вызов `get_companion_world_context(object_id)` проверяет реальный уровень/online и структуру knowledge.
+- Внешний вызов теста, core API и context API защищены `pcall`; одноразовый guard ставится до запуска, поэтому ошибка не должна прерывать update и не повторяется каждый кадр.
+- Пользователю нужно заменить `bind_stalker.script` и `xr_motivator.script`; `gpt_world.script` не менялся. Структурные проверки блоков и скобок этих Lua-файлов прошли; компиляция и runtime в оригинальном CoP ещё не подтверждены.
