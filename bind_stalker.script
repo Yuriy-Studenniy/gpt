@@ -756,19 +756,22 @@ local function gpt_update_companion_poi_knowledge(binder, now)
 	end
 	binder.gpt_world_poi_last_error = nil
 
-	if not binder.gpt_world_poi_detector_ready_logged
-		and type(result.anchors_checked) == "number"
-		and result.anchors_checked > 0 then
+	if not binder.gpt_world_poi_scan_logged
+		and type(result.anchors_total) == "number"
+		and result.anchors_total > 0 then
 		local level_token = string.sub(
 			string.gsub(tostring(result.level_id or "unknown"), "[^%w_]", "_"),
 			1,
 			48
 		)
+		local scan_detail = tostring(result.anchors_checked or 0)
+			.. "_of_" .. tostring(result.anchors_total)
+			.. "_anchors_unavailable_" .. tostring(result.anchors_unavailable or 0)
 		gpt_world_snapshot_marker(
-			"knowledge_poi_detector_ready_" .. level_token,
-			tostring(result.anchors_checked)
+			"knowledge_poi_detector_scan_" .. level_token,
+			scan_detail
 		)
-		binder.gpt_world_poi_detector_ready_logged = true
+		binder.gpt_world_poi_scan_logged = true
 	end
 
 	if type(result.observations) == "table" then
@@ -814,7 +817,7 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_module_loaded = false
 	self.gpt_world_knowledge_retry_at = nil
 	self.gpt_world_poi_next_check_at = nil
-	self.gpt_world_poi_detector_ready_logged = false
+	self.gpt_world_poi_scan_logged = false
 	self.gpt_world_poi_last_error = nil
 	self.gpt_world_knowledge_verified_levels = {}
 	self.gpt_world_knowledge_runtime_passed = false
@@ -857,7 +860,7 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_module_loaded = false
 	self.gpt_world_knowledge_retry_at = nil
 	self.gpt_world_poi_next_check_at = nil
-	self.gpt_world_poi_detector_ready_logged = false
+	self.gpt_world_poi_scan_logged = false
 	self.gpt_world_poi_last_error = nil
 	self.gpt_world_knowledge_verified_levels = {}
 	self.gpt_world_knowledge_runtime_passed = false
