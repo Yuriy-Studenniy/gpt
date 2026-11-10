@@ -152,6 +152,146 @@ local function gpt_try_companion_consumption(npc)
 	return false
 end
 
+-- Retail CoP diagnostic channel already verified for this project.
+local function gpt_companion_world_model_probe_marker(name, value)
+	local token = tostring(name)
+	if value ~= nil then
+		token = token .. "_" .. tostring(value)
+	end
+	token = string.sub(string.gsub(token, "[^%w_]", "_"), 1, 88)
+	pcall(function()
+		get_console():execute("gpt_companion_diag_world_snapshot_" .. token)
+	end)
+end
+
+-- Run only inside the already-online companion's own motivator update.
+-- This is intentionally independent from actor_binder and companion spawning.
+local function gpt_companion_run_world_model_probe(binder, npc)
+	if binder.gpt_world_model_probe_done then
+		return
+	end
+	if npc == nil or npc:alive() ~= true then
+		return
+	end
+
+	local object_id = npc:id()
+	local story_ok, story_id = pcall(function()
+		return get_object_story_id(object_id)
+	end)
+	if not story_ok or story_id ~= "gpt_companion_main" then
+		return
+	end
+
+	local now = time_global()
+	if binder.gpt_world_model_probe_due == nil then
+		binder.gpt_world_model_probe_due = now + 5000
+		gpt_companion_world_model_probe_marker("knowledge_api_deferred_scheduled")
+		return
+	end
+	if now < binder.gpt_world_model_probe_due then
+		return
+	end
+
+	-- One shot per online binder instance, even when a test reports failure.
+	binder.gpt_world_model_probe_done = true
+	gpt_companion_world_model_probe_marker("knowledge_api_deferred_entered")
+
+	local module_ok, levels = pcall(function()
+		return gpt_world.get_catalog_levels()
+	end)
+	if not module_ok or type(levels) ~= "table" then
+		gpt_companion_world_model_probe_marker("knowledge_api_module_unavailable")
+		return
+	end
+	gpt_companion_world_model_probe_marker("knowledge_api_module_ready")
+
+	-- Pure core test: no A-Life access, no live object mutation. The API swaps
+	-- in a temporary claim table and restores the original table and ID counter.
+	local core_ok, results, core_error = pcall(function()
+		return gpt_world.run_knowledge_api_self_test(
+			nil,
+			"level:gpt_world_self_test"
+		)
+	end)
+
+	if not core_ok then
+		gpt_companion_world_model_probe_marker(
+			"knowledge_api_deferred_call_failed",
+			string.sub(tostring(results), 1, 48)
+		)
+	elseif type(results) ~= "table" then
+		gpt_companion_world_model_probe_marker(
+			"knowledge_api_deferred_no_result",
+			tostring(core_error or "nil")
+		)
+	else
+		local checks = {
+			"claim_write_ok",
+			"claim_read_ok",
+			"known_places_ok",
+			"observation_ok",
+			"unconfirmed_observation_rejected_ok"
+		}
+		for _, check_name in ipairs(checks) do
+			if results[check_name] == true then
+				gpt_companion_world_model_probe_marker("knowledge_api_" .. check_name)
+			else
+				gpt_companion_world_model_probe_marker("knowledge_api_" .. check_name .. "_failed")
+			end
+		end
+
+		if results.probe_passed == true then
+			gpt_companion_world_model_probe_marker("knowledge_api_probe_passed")
+			gpt_companion_world_model_probe_marker("knowledge_api_deferred_passed")
+		else
+			local detail = results.error or core_error or "assertion"
+			gpt_companion_world_model_probe_marker(
+				"knowledge_api_error",
+				string.sub(tostring(detail), 1, 48)
+			)
+			gpt_companion_world_model_probe_marker("knowledge_api_probe_failed")
+		end
+	end
+
+	-- Engine-backed context is a separate read-only check on this live NPC.
+	local context_ok, context, context_error = pcall(function()
+		return gpt_world.get_companion_world_context(object_id)
+	end)
+	if not context_ok then
+		gpt_companion_world_model_probe_marker(
+			"context_call_failed",
+			string.sub(tostring(context), 1, 48)
+		)
+		return
+	end
+	if type(context) ~= "table" then
+		gpt_companion_world_model_probe_marker(
+			"context_unavailable",
+			tostring(context_error or "nil")
+		)
+		return
+	end
+
+	local engine = context.engine
+	local level = type(engine) == "table" and engine.level or nil
+	if type(level) ~= "table" or type(level.name) ~= "string" then
+		gpt_companion_world_model_probe_marker("context_level_unavailable")
+		return
+	end
+	gpt_companion_world_model_probe_marker("context_level", level.name)
+	gpt_companion_world_model_probe_marker("context_online", tostring(engine.is_online))
+
+	local knowledge = context.knowledge
+	if engine.is_online == true and type(knowledge) == "table"
+		and knowledge.persistence == "session_only"
+		and type(knowledge.known_places) == "table" then
+		gpt_companion_world_model_probe_marker("context_probe_passed")
+		gpt_companion_world_model_probe_marker("context_dispatch_passed")
+	else
+		gpt_companion_world_model_probe_marker("context_validation_failed")
+	end
+end
+
 class "motivator_binder" (object_binder)
 
 function motivator_binder:__init (obj) super(obj)
@@ -159,6 +299,8 @@ function motivator_binder:__init (obj) super(obj)
 	self.last_update = 0
 	----memusage.collect_info(self.object, "__init")
 	self.first_update = false
+	self.gpt_world_model_probe_due = nil
+	self.gpt_world_model_probe_done = false
 --	self.need_relation_update = false
 
 	self.opened_doors = {} --Õðàíèò òàáëèöó äâåðåé, îòêðûòûõ äàííûì ïåðñîíàæåì (÷òîáû ïîòîì çàêðûòü)
@@ -221,6 +363,8 @@ function motivator_binder:net_spawn(sobject)
 	end
 
 	db.add_obj(self.object)
+	self.gpt_world_model_probe_due = nil
+	self.gpt_world_model_probe_done = false
 
 	-- Âñå CALLBACK-è ñòàâèòü çäåñü:
 	self.object:set_patrol_extrapolate_callback(motivator_binder.extrapolate_callback, self)
@@ -607,6 +751,21 @@ function motivator_binder:update(delta)
 		end
 	else
 		object:set_tip_text_default()
+	end
+
+	-- Run after normal NPC logic/state/squad updates; never before spawn.
+	if object_alive then
+		local probe_ok, probe_error = pcall(
+			gpt_companion_run_world_model_probe,
+			self,
+			object
+		)
+		if not probe_ok then
+			gpt_companion_world_model_probe_marker(
+				"knowledge_api_outer_call_failed",
+				string.sub(tostring(probe_error), 1, 48)
+			)
+		end
 	end
 --[[
 -- Ïîëå÷èëîñü â äâèãëå...
