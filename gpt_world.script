@@ -1635,6 +1635,7 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
     end
 
     local result = {
+        level_id = level.entity_id,
         observations = {},
         anchors_checked = 0,
         anchors_unavailable = 0
