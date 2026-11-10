@@ -615,16 +615,21 @@ local function gpt_update_companion_world_knowledge(binder, now)
 		return gpt_world.get_companion_location_snapshot(companion_id)
 	end)
 	if not snapshot_call_ok then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		gpt_world_snapshot_marker("knowledge_snapshot_call_failed")
 		printf("[GPT_WORLD] Knowledge snapshot call failed: %s", tostring(snapshot))
 		return
 	end
 	if type(snapshot) ~= "table" then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		local error_token = string.sub(tostring(snapshot_error or "unknown"), 1, 64)
 		gpt_world_snapshot_marker("knowledge_snapshot_unavailable", error_token)
 		return
 	end
 	if snapshot.is_online ~= true then
+		-- Online state can lag behind actor save/load; retry quickly rather
+		-- than holding the successful-poll interval while the NPC is offline.
+		binder.gpt_world_knowledge_retry_at = now + 2000
 		gpt_world_snapshot_marker("knowledge_companion_offline")
 		return
 	end
@@ -633,11 +638,13 @@ local function gpt_update_companion_world_knowledge(binder, now)
 		return gpt_world.record_companion_location_observation(snapshot, now / 1000)
 	end)
 	if not observe_call_ok then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		gpt_world_snapshot_marker("knowledge_observation_call_failed")
 		printf("[GPT_WORLD] Knowledge observation call failed: %s", tostring(observation))
 		return
 	end
 	if type(observation) ~= "table" then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		local error_token = string.sub(tostring(observation_error or "unknown"), 1, 64)
 		gpt_world_snapshot_marker("knowledge_observation_failed", error_token)
 		return
@@ -647,6 +654,7 @@ local function gpt_update_companion_world_knowledge(binder, now)
 		return gpt_world.get_companion_world_context(companion_id, snapshot)
 	end)
 	if not context_call_ok or type(context) ~= "table" then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		local error_token = string.sub(tostring(context or context_error or "unknown"), 1, 64)
 		gpt_world_snapshot_marker("knowledge_context_failed", error_token)
 		return
@@ -661,6 +669,7 @@ local function gpt_update_companion_world_knowledge(binder, now)
 		or type(context.knowledge.known_places) ~= "table"
 		or context.knowledge.persistence ~= "actor_pstor"
 		or context.knowledge.current_level_persisted ~= true then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		gpt_world_snapshot_marker("knowledge_context_verification_failed")
 		return
 	end
@@ -675,6 +684,7 @@ local function gpt_update_companion_world_knowledge(binder, now)
 		end
 	end
 	if not level_known then
+		binder.gpt_world_knowledge_retry_at = now + 5000
 		gpt_world_snapshot_marker("knowledge_current_level_not_returned")
 		return
 	end
