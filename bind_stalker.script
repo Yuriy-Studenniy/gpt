@@ -509,8 +509,8 @@ local function gpt_update_world_snapshot(binder, now)
 	local online_confirmed = snapshot ~= nil and snapshot.is_online == true
 	gpt_world_snapshot_marker("online_gate_" .. tostring(online_confirmed))
 	if online_confirmed then
-		-- Record the confirmed online state. Deferred self-tests may run only
-		-- after companion setup has also returned successfully.
+		-- Record the confirmed online state. Durable knowledge ingestion runs
+		-- separately after companion setup has returned successfully.
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
