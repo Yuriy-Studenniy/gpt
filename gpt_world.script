@@ -1560,7 +1560,7 @@ function gpt_world.record_poi_proximity_observation(event)
         source_id = "poi_anchor_proximity:companion_"
             .. tostring(event.companion_alife_object_id)
             .. ":" .. poi.anchor_entity_id,
-        confidence = 0.85,
+        confidence = 0.75,
         created_at = event.created_at,
         last_confirmed_at = event.created_at
     })
