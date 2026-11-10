@@ -406,7 +406,6 @@ local function gpt_world_log_module_status(binder)
 
 	gpt_companion_diagnostic("world_module_loaded_levels_" .. tostring(#levels))
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
-	binder.gpt_world_module_loaded = true
 end
 
 -- Retail X-Ray's reliable diagnostic channel in this project is a harmless
@@ -480,127 +479,8 @@ local function gpt_companion_log_world_snapshot(companion_id)
 	return snapshot, nil
 end
 
--- Run the pure claims/observation API test only after companion setup and
--- the real online snapshot have completed. This is deliberately delayed and
--- isolated from the code path that creates/registers the NPC.
-local function gpt_run_live_world_context_probe(companion_id)
-	gpt_world_snapshot_marker("context_probe_entered")
-	local call_ok, context, context_error = pcall(function()
-		return gpt_world.get_companion_world_context(companion_id)
-	end)
-	if not call_ok then
-		gpt_world_snapshot_marker("context_call_failed", string.sub(tostring(context), 1, 56))
-		return false
-	end
-	if type(context) ~= "table" then
-		gpt_world_snapshot_marker("context_unavailable", tostring(context_error or "nil"))
-		return false
-	end
-
-	local engine = context.engine
-	local level = type(engine) == "table" and engine.level or nil
-	if type(level) ~= "table" or type(level.name) ~= "string" then
-		gpt_world_snapshot_marker("context_level_unavailable")
-		return false
-	end
-	gpt_world_snapshot_marker("context_level", level.name)
-	gpt_world_snapshot_marker("context_online", tostring(engine.is_online))
-
-	local knowledge = context.knowledge
-	if engine.is_online ~= true or type(knowledge) ~= "table"
-		or knowledge.persistence ~= "session_only"
-		or type(knowledge.known_places) ~= "table" then
-		gpt_world_snapshot_marker("context_validation_failed")
-		return false
-	end
-	gpt_world_snapshot_marker("context_probe_passed")
-	return true
-end
-
-local function gpt_update_world_knowledge_self_test(binder, now)
-	if binder.gpt_world_knowledge_self_test_done then
-		return
-	end
-	if binder.gpt_companion_setup_complete ~= true
-		or binder.gpt_world_snapshot_done ~= true
-		or binder.gpt_world_snapshot_online_confirmed ~= true
-		or binder.gpt_world_module_loaded ~= true then
-		return
-	end
-
-	if binder.gpt_world_knowledge_self_test_due == nil then
-		binder.gpt_world_knowledge_self_test_due = now + 5000
-		gpt_world_snapshot_marker("knowledge_api_deferred_scheduled")
-		return
-	end
-	if now < binder.gpt_world_knowledge_self_test_due then
-		return
-	end
-
-	-- Set the guard before invoking Lua code: a failure can never retry every tick.
-	binder.gpt_world_knowledge_self_test_done = true
-	gpt_world_snapshot_marker("knowledge_api_deferred_entered")
-
-	local call_ok, results, error_code = pcall(function()
-		return gpt_world.run_knowledge_api_self_test(
-			nil,
-			"level:gpt_world_self_test"
-		)
-	end)
-
-	-- The pure claims test and live engine context are separate checks. Both
-	-- run only after setup + online confirmation, each inside its own pcall.
-	local context_call_ok, context_result = pcall(
-		gpt_run_live_world_context_probe,
-		binder.gpt_world_snapshot_companion_id
-	)
-	if not context_call_ok then
-		gpt_world_snapshot_marker("context_outer_call_failed",
-			string.sub(tostring(context_result), 1, 48))
-	elseif context_result == true then
-		gpt_world_snapshot_marker("context_dispatch_passed")
-	else
-		gpt_world_snapshot_marker("context_dispatch_completed_with_failure")
-	end
-
-	if not call_ok then
-		gpt_world_snapshot_marker("knowledge_api_deferred_call_failed",
-			string.sub(tostring(results), 1, 56))
-		return
-	end
-	if type(results) ~= "table" then
-		gpt_world_snapshot_marker("knowledge_api_deferred_no_result",
-			tostring(error_code or "nil"))
-		return
-	end
-
-	local checks = {
-		"claim_write_ok",
-		"claim_read_ok",
-		"known_places_ok",
-		"observation_ok",
-		"unconfirmed_observation_rejected_ok"
-	}
-	for _, check_name in ipairs(checks) do
-		if results[check_name] == true then
-			gpt_world_snapshot_marker("knowledge_api_" .. check_name)
-		else
-			gpt_world_snapshot_marker("knowledge_api_" .. check_name .. "_failed")
-		end
-	end
-
-	if results.context_skipped == true then
-		gpt_world_snapshot_marker("knowledge_api_context_skipped")
-	end
-	if results.probe_passed == true then
-		gpt_world_snapshot_marker("knowledge_api_probe_passed")
-		gpt_world_snapshot_marker("knowledge_api_deferred_passed")
-	else
-		local detail = results.error or error_code or "assertion"
-		gpt_world_snapshot_marker("knowledge_api_error", string.sub(tostring(detail), 1, 56))
-		gpt_world_snapshot_marker("knowledge_api_probe_failed")
-	end
-end
+-- Knowledge self-tests run from the companion's own online motivator binder,
+-- never from the player's actor update or spawn/setup path.
 
 local function gpt_update_world_snapshot(binder, now)
 	local companion_id = binder.gpt_world_snapshot_companion_id
@@ -630,7 +510,6 @@ local function gpt_update_world_snapshot(binder, now)
 	if online_confirmed then
 		-- Record the confirmed online state. Deferred self-tests may run only
 		-- after companion setup has also returned successfully.
-		binder.gpt_world_snapshot_online_confirmed = true
 		binder.gpt_world_snapshot_done = true
 		gpt_world_snapshot_marker("polling_complete")
 		return
@@ -733,14 +612,10 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
 	self.gpt_world_module_checked = false
-	self.gpt_world_module_loaded = false
-	self.gpt_world_knowledge_self_test_due = nil
-	self.gpt_world_knowledge_self_test_done = false
 	self.gpt_world_snapshot_companion_id = nil
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
-	self.gpt_world_snapshot_online_confirmed = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -773,14 +648,10 @@ function actor_binder:net_spawn(data)
 	self.gpt_companion_setup_attempts = 0
 	self.gpt_companion_setup_retry_at = nil
 	self.gpt_world_module_checked = false
-	self.gpt_world_module_loaded = false
-	self.gpt_world_knowledge_self_test_due = nil
-	self.gpt_world_knowledge_self_test_done = false
 	self.gpt_world_snapshot_companion_id = nil
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
-	self.gpt_world_snapshot_online_confirmed = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
@@ -1087,18 +958,6 @@ function actor_binder:update(delta)
 
 	-- A temporary A-Life failure must not permanently suppress later attempts.
 	gpt_update_companion_setup(self)
-	-- A final outer guard ensures an unexpected self-test error cannot escape
-	-- into the actor binder update or affect the already-created companion.
-	local knowledge_probe_call_ok, knowledge_probe_error = pcall(
-		gpt_update_world_knowledge_self_test,
-		self,
-		time_global()
-	)
-	if not knowledge_probe_call_ok then
-		gpt_world_snapshot_marker("knowledge_api_outer_call_failed",
-			string.sub(tostring(knowledge_probe_error), 1, 48))
-	end
-
 	treasure_manager.get_treasure_manager():update()
 
 	if not(primary_objects_filled) then
