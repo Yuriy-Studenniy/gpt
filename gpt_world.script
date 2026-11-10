@@ -788,12 +788,17 @@ function gpt_world.get_companion_location_snapshot(companion_alife_id)
 end
 
 
--- Companion knowledge is deliberately separate from the engine snapshot and
--- static catalog. This first backend is session-only until save compatibility
--- for the companion A-Life squad has been audited.
+-- Companion knowledge is separate from the engine snapshot and static catalog.
+-- Confirmed known places use the actor's existing PSTOR save channel as a
+-- compatibility bridge. It is already serialized by actor_binder save/load;
+-- the companion squad's binary STATE_Write/STATE_Read packet is not modified.
+-- A future dedicated companion-memory backend can replace this bridge.
 local GPT_WORLD_CLAIMS = {}
 local GPT_WORLD_NEXT_CLAIM_ID = 1
 local GPT_WORLD_MAX_CLAIMS = 512
+local GPT_WORLD_PERSISTENCE_KEY = "gpt_world_known_places_v1"
+local GPT_WORLD_MAX_PERSISTED_PLACES = 256
+local GPT_WORLD_PERSISTENCE_SUSPENDED = false
 
 local GPT_WORLD_CLAIM_STATUSES = {
     observed = true,
@@ -823,6 +828,153 @@ local function gpt_world_copy_claim(claim)
         end
     end
     return copy
+end
+
+-- The actor's PSTOR is an existing save-backed scalar store in stock CoP.
+-- We only serialize catalog entity IDs; no engine pointers or Lua tables enter it.
+local function gpt_world_get_actor_pstor()
+    if type(db) ~= "table" or db.actor == nil
+        or type(db.storage) ~= "table" then
+        return nil, "actor_storage_unavailable"
+    end
+    if type(xr_logic) ~= "table"
+        or type(xr_logic.pstor_retrieve) ~= "function"
+        or type(xr_logic.pstor_store) ~= "function" then
+        return nil, "pstor_api_unavailable"
+    end
+
+    local actor = db.actor
+    local id_ok, actor_id = pcall(function()
+        return actor:id()
+    end)
+    if not id_ok or type(actor_id) ~= "number"
+        or db.storage[actor_id] == nil then
+        return nil, "actor_storage_unavailable"
+    end
+    return actor, nil
+end
+
+local function gpt_world_is_safe_catalog_id(entity_id)
+    return type(entity_id) == "string"
+        and string.match(entity_id, "^[%w:_]+$") ~= nil
+end
+
+local function gpt_world_read_persisted_place_ids()
+    if GPT_WORLD_PERSISTENCE_SUSPENDED then
+        return {}, nil
+    end
+
+    local actor, actor_error = gpt_world_get_actor_pstor()
+    if actor == nil then
+        return nil, actor_error
+    end
+
+    local read_ok, encoded = pcall(
+        xr_logic.pstor_retrieve,
+        actor,
+        GPT_WORLD_PERSISTENCE_KEY,
+        ""
+    )
+    if not read_ok then
+        return nil, "pstor_read_failed"
+    end
+    if type(encoded) ~= "string" then
+        return nil, "pstor_value_not_string"
+    end
+
+    local ids = {}
+    local seen = {}
+    for entity_id in string.gmatch(encoded, "([^|]+)") do
+        if gpt_world_is_safe_catalog_id(entity_id)
+            and not seen[entity_id]
+            and gpt_world.get_catalog_entity(entity_id) ~= nil then
+            seen[entity_id] = true
+            ids[#ids + 1] = entity_id
+        end
+    end
+    table.sort(ids)
+    return ids, nil
+end
+
+local function gpt_world_persist_known_place(entity_id)
+    if not gpt_world_is_safe_catalog_id(entity_id)
+        or gpt_world.get_catalog_entity(entity_id) == nil then
+        return false, "entity_not_catalogued"
+    end
+
+    local ids, read_error = gpt_world_read_persisted_place_ids()
+    if ids == nil then
+        return false, read_error
+    end
+    for _, existing_id in ipairs(ids) do
+        if existing_id == entity_id then
+            return true, nil
+        end
+    end
+    if #ids >= GPT_WORLD_MAX_PERSISTED_PLACES then
+        return false, "persistent_place_limit"
+    end
+
+    ids[#ids + 1] = entity_id
+    table.sort(ids)
+    local encoded = table.concat(ids, "|")
+    local actor, actor_error = gpt_world_get_actor_pstor()
+    if actor == nil then
+        return false, actor_error
+    end
+
+    local write_ok = pcall(
+        xr_logic.pstor_store,
+        actor,
+        GPT_WORLD_PERSISTENCE_KEY,
+        encoded
+    )
+    if not write_ok then
+        return false, "pstor_write_failed"
+    end
+    return true, nil
+end
+
+local function gpt_world_persisted_place_claim(entity_id)
+    local catalog_record = gpt_world.get_catalog_entity(entity_id)
+    if catalog_record == nil then
+        return nil
+    end
+
+    local level_id = catalog_record.level_id
+    if catalog_record.entity_type == "level" then
+        level_id = entity_id
+    end
+
+    return {
+        claim_id = "claim:pstor:" .. entity_id,
+        subject_id = entity_id,
+        level_id = level_id,
+        predicate = "known_place",
+        value = true,
+        status = "observed",
+        source_type = "observation",
+        source_id = "actor_pstor_restore",
+        confidence = 1,
+        created_at = 0,
+        last_confirmed_at = 0,
+        persistence_backend = "actor_pstor"
+    }
+end
+
+function gpt_world.get_persistence_status()
+    local ids, read_error = gpt_world_read_persisted_place_ids()
+    if ids == nil then
+        return {
+            backend = "unavailable",
+            persisted_place_count = 0,
+            error = read_error
+        }
+    end
+    return {
+        backend = "actor_pstor",
+        persisted_place_count = #ids
+    }
 end
 
 -- Stores one explicit knowledge claim in the current Lua session.
@@ -871,6 +1023,21 @@ function gpt_world.record_claim(claim)
         return nil, "claim_store_full"
     end
 
+    local persist_known_place =
+        claim.predicate == "known_place"
+        and claim.value == true
+        and claim.status == "observed"
+        and claim.source_type == "observation"
+        and gpt_world.get_catalog_entity(claim.subject_id) ~= nil
+
+    if persist_known_place then
+        local persist_ok, persist_error =
+            gpt_world_persist_known_place(claim.subject_id)
+        if not persist_ok then
+            return nil, "persistence_failed:" .. tostring(persist_error)
+        end
+    end
+
     local stored = {
         claim_id = "claim:" .. tostring(GPT_WORLD_NEXT_CLAIM_ID),
         subject_id = claim.subject_id,
@@ -884,6 +1051,10 @@ function gpt_world.record_claim(claim)
         created_at = claim.created_at,
         last_confirmed_at = claim.last_confirmed_at
     }
+
+    if persist_known_place then
+        stored.persistence_backend = "actor_pstor"
+    end
 
     GPT_WORLD_NEXT_CLAIM_ID = GPT_WORLD_NEXT_CLAIM_ID + 1
     GPT_WORLD_CLAIMS[#GPT_WORLD_CLAIMS + 1] = stored
@@ -901,10 +1072,27 @@ function gpt_world.get_claims(subject_id, predicate)
     end
 
     local result = {}
+    local seen = {}
     for _, claim in ipairs(GPT_WORLD_CLAIMS) do
         if (subject_id == nil or claim.subject_id == subject_id)
             and (predicate == nil or claim.predicate == predicate) then
             result[#result + 1] = gpt_world_copy_claim(claim)
+            seen[tostring(claim.subject_id) .. "|" .. tostring(claim.predicate)] = true
+        end
+    end
+
+    local persisted_ids = gpt_world_read_persisted_place_ids()
+    if type(persisted_ids) == "table"
+        and (predicate == nil or predicate == "known_place") then
+        for _, entity_id in ipairs(persisted_ids) do
+            local key = entity_id .. "|known_place"
+            if (subject_id == nil or entity_id == subject_id)
+                and not seen[key] then
+                local persisted_claim = gpt_world_persisted_place_claim(entity_id)
+                if persisted_claim ~= nil then
+                    result[#result + 1] = persisted_claim
+                end
+            end
         end
     end
     return result
@@ -924,7 +1112,8 @@ function gpt_world.get_known_places(filters)
     end
 
     local places_by_id = {}
-    for _, claim in ipairs(GPT_WORLD_CLAIMS) do
+    local all_claims = gpt_world.get_claims(nil, "known_place")
+    for _, claim in ipairs(all_claims) do
         if claim.predicate == "known_place" then
             local place_id = claim.subject_id
             local include_place = true
@@ -1019,9 +1208,16 @@ end
 -- Gives future dialogue/agent code a single envelope while keeping objective
 -- engine state and character knowledge in separate named fields.
 -- Knowledge includes only explicit claims; it is not inferred from the catalog.
-function gpt_world.get_companion_world_context(companion_alife_id)
-    local snapshot, snapshot_error =
-        gpt_world.get_companion_location_snapshot(companion_alife_id)
+function gpt_world.get_companion_world_context(companion_alife_id, snapshot_override)
+    local snapshot = snapshot_override
+    local snapshot_error = nil
+    if type(snapshot) ~= "table"
+        or snapshot.source ~= "xray_alife_snapshot"
+        or (companion_alife_id ~= nil
+            and snapshot.companion_alife_object_id ~= companion_alife_id) then
+        snapshot, snapshot_error =
+            gpt_world.get_companion_location_snapshot(companion_alife_id)
+    end
     if snapshot == nil then
         return nil, snapshot_error
     end
@@ -1030,14 +1226,132 @@ function gpt_world.get_companion_world_context(companion_alife_id)
     local known_places = gpt_world.get_known_places({
         level_id = level_id
     })
+    local all_known_places = gpt_world.get_known_places()
+    local persistence_status = gpt_world.get_persistence_status()
 
     return {
         engine = snapshot,
         knowledge = {
             known_places = known_places,
-            persistence = "session_only"
+            all_known_places = all_known_places,
+            persistence = persistence_status.backend,
+            persisted_place_count = persistence_status.persisted_place_count
         },
         source = "gpt_world_context"
+    }, nil
+end
+
+-- Records a real online A-Life snapshot as observed geographic knowledge.
+-- A level counts as visited only while the companion is actually online there.
+-- Assigned Smart Terrain is recorded only when the snapshot resolves a catalog entry.
+function gpt_world.record_companion_location_observation(snapshot, observed_at)
+    if type(snapshot) ~= "table"
+        or snapshot.source ~= "xray_alife_snapshot"
+        or snapshot.companion_story_id ~= GPT_WORLD_COMPANION_STORY_ID then
+        return nil, "invalid_engine_snapshot"
+    end
+    if snapshot.is_online ~= true then
+        return nil, "companion_not_online"
+    end
+    if type(observed_at) ~= "number" or observed_at < 0 then
+        return nil, "invalid_observation_time"
+    end
+
+    local level_id = snapshot.level and snapshot.level.entity_id or nil
+    local level_record = type(level_id) == "string"
+        and gpt_world.get_catalog_entity(level_id) or nil
+    if type(level_record) ~= "table" or level_record.entity_type ~= "level" then
+        return nil, "level_not_catalogued"
+    end
+
+    local source_id = snapshot.companion_alife_object_id
+    if type(source_id) ~= "number" then
+        return nil, "companion_source_id_unavailable"
+    end
+
+    local recorded = {}
+    local function observe_once(entity_id, entity_level_id)
+        local existing = gpt_world.get_claims(entity_id, "known_place")
+        for _, claim in ipairs(existing) do
+            if claim.value == true then
+                return true, false, nil
+            end
+        end
+
+        local claim, observation_error = gpt_world.record_observation({
+            event_type = "place_observed",
+            confirmed = true,
+            entity_id = entity_id,
+            level_id = entity_level_id,
+            source_id = source_id,
+            created_at = observed_at,
+            confidence = 1
+        })
+        if claim == nil then
+            return false, false, observation_error
+        end
+        recorded[#recorded + 1] = claim
+        return true, true, nil
+    end
+
+    local level_ok, level_new, level_error = observe_once(level_id, level_id)
+    if not level_ok then
+        return nil, "level_observation_failed:" .. tostring(level_error)
+    end
+
+    local smart_terrain_id = nil
+    local smart_terrain = snapshot.smart_terrain
+    if type(smart_terrain) == "table"
+        and type(smart_terrain.entity_id) == "string" then
+        local smart_record = gpt_world.get_catalog_entity(smart_terrain.entity_id)
+        if type(smart_record) == "table"
+            and smart_record.level_id == level_id then
+            local smart_ok, smart_new, smart_error =
+                observe_once(smart_terrain.entity_id, level_id)
+            if not smart_ok then
+                return nil, "smart_terrain_observation_failed:" .. tostring(smart_error)
+            end
+            smart_terrain_id = smart_terrain.entity_id
+        end
+    end
+
+    local persistence_status = gpt_world.get_persistence_status()
+    local known_places = gpt_world.get_known_places({
+        level_id = level_id
+    })
+    local current_level_known = false
+    local current_smart_terrain_known = smart_terrain_id == nil
+    for _, place in ipairs(known_places) do
+        if place.entity_id == level_id and place.known == true then
+            current_level_known = true
+        end
+        if smart_terrain_id ~= nil
+            and place.entity_id == smart_terrain_id and place.known == true then
+            current_smart_terrain_known = true
+        end
+    end
+
+    if not current_level_known then
+        return nil, "level_not_returned_by_knowledge_query"
+    end
+    if not current_smart_terrain_known then
+        return nil, "smart_terrain_not_returned_by_knowledge_query"
+    end
+    if persistence_status.backend ~= "actor_pstor" then
+        return nil, "persistent_backend_unavailable:"
+            .. tostring(persistence_status.error or persistence_status.backend)
+    end
+
+    return {
+        snapshot = snapshot,
+        current_level_id = level_id,
+        current_smart_terrain_id = smart_terrain_id,
+        observations = recorded,
+        current_level_known = current_level_known,
+        current_smart_terrain_known = current_smart_terrain_known,
+        persistence_backend = persistence_status.backend,
+        persisted_place_count = persistence_status.persisted_place_count,
+        already_known = #recorded == 0
     }, nil
 end
 
@@ -1078,6 +1392,8 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
 
     local previous_claims = GPT_WORLD_CLAIMS
     local previous_next_claim_id = GPT_WORLD_NEXT_CLAIM_ID
+    local previous_persistence_suspended = GPT_WORLD_PERSISTENCE_SUSPENDED
+    GPT_WORLD_PERSISTENCE_SUSPENDED = true
     GPT_WORLD_CLAIMS = {}
     GPT_WORLD_NEXT_CLAIM_ID = 1
 
@@ -1217,6 +1533,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
     -- Always restore caller data and IDs; self-test leaves no test claims.
     GPT_WORLD_CLAIMS = previous_claims
     GPT_WORLD_NEXT_CLAIM_ID = previous_next_claim_id
+    GPT_WORLD_PERSISTENCE_SUSPENDED = previous_persistence_suspended
 
     if not run_ok then
         result.error = tostring(run_error)
