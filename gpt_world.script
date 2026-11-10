@@ -1606,6 +1606,45 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
         }, nil
     end
 
+    local known_places = gpt_world.get_known_places({ level_id = level.entity_id })
+    local known_by_id = {}
+    local restored_pois = {}
+    for _, place in ipairs(known_places) do
+        if place.known == true then
+            known_by_id[place.entity_id] = true
+            if place.catalog ~= nil and place.catalog.entity_type == "poi"
+                and type(place.claims) == "table" then
+                for _, claim in ipairs(place.claims) do
+                    if claim.source_id == "actor_pstor_restore" then
+                        restored_pois[#restored_pois + 1] = {
+                            entity_id = place.entity_id,
+                            display_name = place.catalog.display_name
+                        }
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    local unknown_poi_count = 0
+    for _, poi in ipairs(pois) do
+        if not known_by_id[poi.entity_id] then
+            unknown_poi_count = unknown_poi_count + 1
+        end
+    end
+    if unknown_poi_count == 0 then
+        return {
+            level_id = level.entity_id,
+            restored_pois = restored_pois,
+            observations = {},
+            anchors_total = #pois,
+            anchors_checked = 0,
+            anchors_unavailable = 0,
+            observation_failures = 0
+        }, nil
+    end
+
     local online_companion = gpt_world_get_online_companion_object(companion_alife_id)
     if online_companion == nil then
         return nil, "companion_online_object_unavailable"
@@ -1632,27 +1671,6 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
     local graph = gpt_world_get_game_graph()
     if simulation == nil or graph == nil then
         return nil, "world_graph_unavailable"
-    end
-
-    local known_places = gpt_world.get_known_places({ level_id = level.entity_id })
-    local known_by_id = {}
-    local restored_pois = {}
-    for _, place in ipairs(known_places) do
-        if place.known == true then
-            known_by_id[place.entity_id] = true
-            if place.catalog ~= nil and place.catalog.entity_type == "poi"
-                and type(place.claims) == "table" then
-                for _, claim in ipairs(place.claims) do
-                    if claim.source_id == "actor_pstor_restore" then
-                        restored_pois[#restored_pois + 1] = {
-                            entity_id = place.entity_id,
-                            display_name = place.catalog.display_name
-                        }
-                        break
-                    end
-                end
-            end
-        end
     end
 
     local result = {
@@ -1691,7 +1709,6 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
                             anchor_position = gpt_world_safe_method(anchor, "position")
                         end
                         if anchor_position ~= nil then
-                            result.anchors_checked = result.anchors_checked + 1
                             local distance_squared = gpt_world_safe_method(
                                 companion_position,
                                 "distance_to_sqr",
@@ -1704,30 +1721,34 @@ function gpt_world.observe_companion_poi_proximity(companion_alife_id, observed_
                             end
 
                             if type(distance_squared) == "number"
-                                and distance_squared >= 0
-                                and distance_squared <= discovery_radius * discovery_radius then
-                                local claim, claim_error =
-                                    gpt_world.record_poi_proximity_observation({
-                                        event_type = "poi_anchor_proximity",
-                                        confirmed = true,
-                                        entity_id = poi.entity_id,
-                                        level_id = poi.level_id,
-                                        anchor_entity_id = poi.anchor_entity_id,
-                                        companion_alife_object_id = companion_alife_id,
-                                        distance_squared = distance_squared,
-                                        created_at = observed_at
-                                    })
-                                if claim ~= nil then
-                                    known_by_id[poi.entity_id] = true
-                                    result.observations[#result.observations + 1] = {
-                                        entity_id = poi.entity_id,
-                                        display_name = poi.display_name,
-                                        anchor_entity_id = poi.anchor_entity_id,
-                                        distance_m = math.sqrt(distance_squared)
-                                    }
-                                elseif claim_error ~= "poi_already_known" then
-                                    result.observation_failures = result.observation_failures + 1
+                                and distance_squared >= 0 then
+                                result.anchors_checked = result.anchors_checked + 1
+                                if distance_squared <= discovery_radius * discovery_radius then
+                                    local claim, claim_error =
+                                        gpt_world.record_poi_proximity_observation({
+                                            event_type = "poi_anchor_proximity",
+                                            confirmed = true,
+                                            entity_id = poi.entity_id,
+                                            level_id = poi.level_id,
+                                            anchor_entity_id = poi.anchor_entity_id,
+                                            companion_alife_object_id = companion_alife_id,
+                                            distance_squared = distance_squared,
+                                            created_at = observed_at
+                                        })
+                                    if claim ~= nil then
+                                        known_by_id[poi.entity_id] = true
+                                        result.observations[#result.observations + 1] = {
+                                            entity_id = poi.entity_id,
+                                            display_name = poi.display_name,
+                                            anchor_entity_id = poi.anchor_entity_id,
+                                            distance_m = math.sqrt(distance_squared)
+                                        }
+                                    elseif claim_error ~= "poi_already_known" then
+                                        result.observation_failures = result.observation_failures + 1
+                                    end
                                 end
+                            else
+                                result.anchors_unavailable = result.anchors_unavailable + 1
                             end
                         else
                             result.anchors_unavailable = result.anchors_unavailable + 1
