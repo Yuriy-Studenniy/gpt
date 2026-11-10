@@ -1381,6 +1381,15 @@ function gpt_world.record_companion_location_observation(snapshot, observed_at)
     }, nil
 end
 
+-- Called immediately after actor_binder restores PSTOR from a save.
+-- Drop Lua-session claims so the save-backed list is the sole authority after load.
+function gpt_world.reset_session_after_actor_load()
+    GPT_WORLD_CLAIMS = {}
+    GPT_WORLD_NEXT_CLAIM_ID = 1
+    GPT_WORLD_PERSISTENCE_SUSPENDED = false
+    return true
+end
+
 -- Runs the public knowledge API against an isolated temporary claim table.
 -- The caller's in-session claims and claim ID sequence are restored even if
 -- an assertion or the live engine context read fails.
