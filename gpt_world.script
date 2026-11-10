@@ -1232,7 +1232,8 @@ function gpt_world.get_known_places(filters)
                         entry.catalog = {
                             entity_type = catalog_record.entity_type,
                             display_name = catalog_record.display_name,
-                            category = catalog_record.category
+                            category = catalog_record.category,
+                            anchor_entity_id = catalog_record.anchor_entity_id
                         }
                     end
                     places_by_id[place_id] = entry
@@ -1543,7 +1544,13 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
         local skadovsk_catalog = gpt_world.get_catalog_entity("poi:zaton:skadovsk")
         local zaton_pois = gpt_world.get_catalog_pois("level:zaton")
         local has_skadovsk = false
+        local invalid_anchor = false
         for _, poi in ipairs(zaton_pois) do
+            local anchor = gpt_world.get_catalog_entity(poi.anchor_entity_id)
+            if anchor == nil or anchor.entity_type ~= "smart_terrain"
+                or anchor.level_id ~= poi.level_id then
+                invalid_anchor = true
+            end
             if poi.entity_id == "poi:zaton:skadovsk"
                 and poi.anchor_entity_id == "smart:zaton:zat_stalker_base_smart" then
                 has_skadovsk = true
@@ -1553,7 +1560,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
             or skadovsk_catalog.entity_type ~= "poi"
             or skadovsk_catalog.level_id ~= "level:zaton"
             or type(zaton_pois) ~= "table" or #zaton_pois ~= 5
-            or not has_skadovsk then
+            or not has_skadovsk or invalid_anchor then
             error("poi_catalog_lookup_mismatch")
         end
         result.poi_catalog_ok = true
@@ -1679,6 +1686,7 @@ function gpt_world.run_knowledge_api_self_test(companion_alife_id, test_level_id
             if place.entity_id == "poi:zaton:skadovsk"
                 and place.catalog ~= nil
                 and place.catalog.display_name == "Скадовск"
+                and place.catalog.anchor_entity_id == "smart:zaton:zat_stalker_base_smart"
                 and place.claims[1] ~= nil
                 and place.claims[1].status == "reported" then
                 reported_poi_has_metadata = true
