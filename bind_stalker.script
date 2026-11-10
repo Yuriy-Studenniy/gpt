@@ -404,6 +404,7 @@ local function gpt_world_log_module_status(binder)
 		return
 	end
 
+	binder.gpt_world_module_loaded = true
 	gpt_companion_diagnostic("world_module_loaded_levels_" .. tostring(#levels))
 	printf("[GPT_WORLD] Module loaded; levels=%s", tostring(#levels))
 end
@@ -593,6 +594,116 @@ local function gpt_update_companion_setup(binder)
 end
 
 ----------------------------------------------------------------------------------------------------------------------
+-- Record actual companion location as durable World Model knowledge.
+-- This runs from the player's actor binder, after companion/squad setup,
+-- and is throttled to once per 15 seconds. It never runs in NPC update_logic.
+local function gpt_update_companion_world_knowledge(binder, now)
+	if binder.gpt_companion_setup_complete ~= true
+		or binder.gpt_world_module_loaded ~= true
+		or binder.gpt_world_snapshot_companion_id == nil then
+		return
+	end
+
+	if binder.gpt_world_knowledge_retry_at ~= nil
+		and now < binder.gpt_world_knowledge_retry_at then
+		return
+	end
+	binder.gpt_world_knowledge_retry_at = now + 15000
+
+	local companion_id = binder.gpt_world_snapshot_companion_id
+	local snapshot_call_ok, snapshot, snapshot_error = pcall(function()
+		return gpt_world.get_companion_location_snapshot(companion_id)
+	end)
+	if not snapshot_call_ok then
+		gpt_world_snapshot_marker("knowledge_snapshot_call_failed")
+		printf("[GPT_WORLD] Knowledge snapshot call failed: %s", tostring(snapshot))
+		return
+	end
+	if type(snapshot) ~= "table" then
+		local error_token = string.sub(tostring(snapshot_error or "unknown"), 1, 64)
+		gpt_world_snapshot_marker("knowledge_snapshot_unavailable", error_token)
+		return
+	end
+	if snapshot.is_online ~= true then
+		gpt_world_snapshot_marker("knowledge_companion_offline")
+		return
+	end
+
+	local observe_call_ok, observation, observation_error = pcall(function()
+		return gpt_world.record_companion_location_observation(snapshot, now / 1000)
+	end)
+	if not observe_call_ok then
+		gpt_world_snapshot_marker("knowledge_observation_call_failed")
+		printf("[GPT_WORLD] Knowledge observation call failed: %s", tostring(observation))
+		return
+	end
+	if type(observation) ~= "table" then
+		local error_token = string.sub(tostring(observation_error or "unknown"), 1, 64)
+		gpt_world_snapshot_marker("knowledge_observation_failed", error_token)
+		return
+	end
+
+	local context_call_ok, context, context_error = pcall(function()
+		return gpt_world.get_companion_world_context(companion_id, snapshot)
+	end)
+	if not context_call_ok or type(context) ~= "table" then
+		local error_token = string.sub(tostring(context or context_error or "unknown"), 1, 64)
+		gpt_world_snapshot_marker("knowledge_context_failed", error_token)
+		return
+	end
+
+	local level_id = observation.current_level_id
+	if type(context.engine) ~= "table"
+		or context.engine.is_online ~= true
+		or type(context.engine.level) ~= "table"
+		or context.engine.level.entity_id ~= level_id
+		or type(context.knowledge) ~= "table"
+		or type(context.knowledge.known_places) ~= "table"
+		or context.knowledge.persistence ~= "actor_pstor"
+		or context.knowledge.current_level_persisted ~= true then
+		gpt_world_snapshot_marker("knowledge_context_verification_failed")
+		return
+	end
+
+	local level_known = false
+	for _, place in ipairs(context.knowledge.known_places) do
+		if type(place) == "table"
+			and place.entity_id == level_id
+			and place.known == true then
+			level_known = true
+			break
+		end
+	end
+	if not level_known then
+		gpt_world_snapshot_marker("knowledge_current_level_not_returned")
+		return
+	end
+
+	local level_token = string.sub(string.gsub(level_id, "[^%w_]", "_"), 1, 56)
+	if type(observation.observations) == "table"
+		and #observation.observations > 0 then
+		gpt_world_snapshot_marker("knowledge_observation_recorded_" .. level_token)
+	else
+		gpt_world_snapshot_marker("knowledge_observation_already_known_" .. level_token)
+	end
+	gpt_world_snapshot_marker("knowledge_context_read_ok_" .. level_token)
+	gpt_world_snapshot_marker("knowledge_current_level_persisted_" .. level_token)
+
+	local verified_levels = binder.gpt_world_knowledge_verified_levels
+	if type(verified_levels) ~= "table" then
+		verified_levels = {}
+		binder.gpt_world_knowledge_verified_levels = verified_levels
+	end
+	if not verified_levels[level_id] then
+		verified_levels[level_id] = true
+		gpt_world_snapshot_marker("knowledge_level_verified_" .. level_token)
+	end
+	if not binder.gpt_world_knowledge_runtime_passed then
+		binder.gpt_world_knowledge_runtime_passed = true
+		gpt_world_snapshot_marker("knowledge_runtime_passed")
+	end
+end
+
 class "actor_binder" (object_binder)
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:__init (obj) super(obj)
@@ -616,6 +727,10 @@ function actor_binder:__init (obj) super(obj)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
+	self.gpt_world_module_loaded = false
+	self.gpt_world_knowledge_retry_at = nil
+	self.gpt_world_knowledge_verified_levels = {}
+	self.gpt_world_knowledge_runtime_passed = false
 end
 ----------------------------------------------------------------------------------------------------------------------
 function actor_binder:net_spawn(data)
@@ -652,6 +767,10 @@ function actor_binder:net_spawn(data)
 	self.gpt_world_snapshot_attempts = 0
 	self.gpt_world_snapshot_retry_at = nil
 	self.gpt_world_snapshot_done = false
+	self.gpt_world_module_loaded = false
+	self.gpt_world_knowledge_retry_at = nil
+	self.gpt_world_knowledge_verified_levels = {}
+	self.gpt_world_knowledge_runtime_passed = false
 	benchmark.main()							          --' Distemper 06.2008 --
 	return true
 end
@@ -958,6 +1077,15 @@ function actor_binder:update(delta)
 
 	-- A temporary A-Life failure must not permanently suppress later attempts.
 	gpt_update_companion_setup(self)
+
+	-- World Model observation is deliberately outside every NPC update path.
+	local world_knowledge_call_ok, world_knowledge_error =
+		pcall(gpt_update_companion_world_knowledge, self, time_global())
+	if not world_knowledge_call_ok then
+		gpt_world_snapshot_marker("knowledge_update_outer_failed")
+		printf("[GPT_WORLD] Knowledge update failed safely: %s", tostring(world_knowledge_error))
+	end
+
 	treasure_manager.get_treasure_manager():update()
 
 	if not(primary_objects_filled) then
