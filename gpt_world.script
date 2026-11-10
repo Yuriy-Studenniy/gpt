@@ -4,7 +4,7 @@
 
     This module provides a static world catalog, read-only X-Ray snapshots,
     and explicit source-aware knowledge claims for the unique companion.
-    It does not scan the world, call an LLM, or change NPC behavior.
+    It does not scan the whole level, call an LLM, or change NPC behavior.
 ]]
 
 gpt_world = gpt_world or {}
