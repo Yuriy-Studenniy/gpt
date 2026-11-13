@@ -1257,9 +1257,9 @@ function actor_binder:update(delta)
 		local fs_available = type(getFS) == "function"
 		local notice = "GPT IPC: actor update active; io.open="
 			.. tostring(io_open_available) .. "; getFS=" .. tostring(fs_available)
-		if type(news_manager) == "table" and type(news_manager.send_tip) == "function" then
+		if news_manager ~= nil and news_manager.send_tip ~= nil and db.actor ~= nil then
 			pcall(function()
-				news_manager.send_tip(self.object, notice, nil, nil, 6000)
+				news_manager.send_tip(db.actor, notice, nil, nil, 6000)
 			end)
 		end
 	end
