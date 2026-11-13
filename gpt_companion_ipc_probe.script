@@ -1,0 +1,170 @@
+-- Minimal file-based IPC probe for original X-Ray / CoP 1.6.02.
+-- Accepts exactly one "ping" request from the external test process.
+-- This is a transport smoke-test only; it does not execute game commands.
+
+gpt_companion_ipc_probe = {}
+
+local GPT_IPC_PROBE_POLL_MS = 500
+local GPT_IPC_PROBE_NEXT_POLL = 0
+local GPT_IPC_PROBE_DISABLED = false
+local GPT_IPC_PROBE_HANDLED = false
+local GPT_IPC_PROBE_CMD_PATH = nil
+local GPT_IPC_PROBE_REPLY_TMP_PATH = nil
+local GPT_IPC_PROBE_REPLY_PATH = nil
+
+local function gpt_ipc_probe_emit(marker, name, value)
+    if type(marker) == "function" then
+        pcall(marker, name, value)
+    end
+end
+
+local function gpt_ipc_probe_resolve_paths()
+    if GPT_IPC_PROBE_CMD_PATH ~= nil then
+        return true, nil
+    end
+
+    if type(getFS) ~= "function" then
+        return false, "getfs_unavailable"
+    end
+
+    local fs_ok, fs = pcall(getFS)
+    if not fs_ok or fs == nil or type(fs.update_path) ~= "function" then
+        return false, "filesystem_api_unavailable"
+    end
+
+    local path_ok, command_path, reply_tmp_path, reply_path = pcall(function()
+        return
+            fs:update_path("$app_data_root$", "gpt_companion_ipc_cmd.txt"),
+            fs:update_path("$app_data_root$", "gpt_companion_ipc_reply.tmp"),
+            fs:update_path("$app_data_root$", "gpt_companion_ipc_reply.txt")
+    end)
+
+    if not path_ok
+        or type(command_path) ~= "string"
+        or type(reply_tmp_path) ~= "string"
+        or type(reply_path) ~= "string" then
+        return false, "app_data_path_unavailable"
+    end
+
+    GPT_IPC_PROBE_CMD_PATH = command_path
+    GPT_IPC_PROBE_REPLY_TMP_PATH = reply_tmp_path
+    GPT_IPC_PROBE_REPLY_PATH = reply_path
+    return true, nil
+end
+
+local function gpt_ipc_probe_write_reply(request_id, status, text)
+    local open_ok, file, open_error = pcall(
+        io.open,
+        GPT_IPC_PROBE_REPLY_TMP_PATH,
+        "w"
+    )
+    if not open_ok or file == nil then
+        return false, "reply_open_failed"
+    end
+
+    local write_ok = pcall(function()
+        file:write("v1 ", request_id, " ", status, " ", text, "\n")
+        file:flush()
+        file:close()
+    end)
+    if not write_ok then
+        pcall(function() file:close() end)
+        return false, "reply_write_failed"
+    end
+
+    pcall(os.remove, GPT_IPC_PROBE_REPLY_PATH)
+    local rename_call_ok, rename_result = pcall(
+        os.rename,
+        GPT_IPC_PROBE_REPLY_TMP_PATH,
+        GPT_IPC_PROBE_REPLY_PATH
+    )
+    if not rename_call_ok or rename_result == nil then
+        return false, "reply_rename_failed"
+    end
+
+    return true, nil
+end
+
+function gpt_companion_ipc_probe.update(now, marker)
+    if GPT_IPC_PROBE_DISABLED or GPT_IPC_PROBE_HANDLED then
+        return
+    end
+
+    if type(io) ~= "table" or type(io.open) ~= "function"
+        or type(os) ~= "table"
+        or type(os.remove) ~= "function"
+        or type(os.rename) ~= "function" then
+        GPT_IPC_PROBE_DISABLED = true
+        gpt_ipc_probe_emit(marker, "ipc_probe_standard_io_unavailable")
+        return
+    end
+
+    if type(now) ~= "number" then
+        return
+    end
+    if now < GPT_IPC_PROBE_NEXT_POLL then
+        return
+    end
+    GPT_IPC_PROBE_NEXT_POLL = now + GPT_IPC_PROBE_POLL_MS
+
+    local paths_ok, paths_error = gpt_ipc_probe_resolve_paths()
+    if not paths_ok then
+        GPT_IPC_PROBE_DISABLED = true
+        gpt_ipc_probe_emit(marker, "ipc_probe_path_init_failed", paths_error)
+        return
+    end
+
+    local open_ok, file = pcall(io.open, GPT_IPC_PROBE_CMD_PATH, "r")
+    if not open_ok then
+        GPT_IPC_PROBE_DISABLED = true
+        gpt_ipc_probe_emit(marker, "ipc_probe_command_open_exception")
+        return
+    end
+    if file == nil then
+        return
+    end
+
+    local read_ok, line = pcall(function()
+        local value = file:read("*l")
+        file:close()
+        return value
+    end)
+    pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
+
+    if not read_ok or type(line) ~= "string" then
+        gpt_ipc_probe_emit(marker, "ipc_probe_command_read_failed")
+        return
+    end
+    if #line > 160 then
+        gpt_ipc_probe_emit(marker, "ipc_probe_command_too_long")
+        return
+    end
+
+    local protocol, request_id, command = string.match(
+        line,
+        "^(%S+)%s+([%w_%-]+)%s+(%w+)$"
+    )
+    if protocol ~= "v1" or request_id == nil or command == nil
+        or #request_id > 40 then
+        gpt_ipc_probe_emit(marker, "ipc_probe_command_invalid")
+        return
+    end
+
+    GPT_IPC_PROBE_HANDLED = true
+    gpt_ipc_probe_emit(marker, "ipc_probe_command_received", request_id)
+
+    local status = "unsupported"
+    local text = "only_ping_supported"
+    if command == "ping" then
+        status = "ok"
+        text = "pong_gpt_companion_ipc_probe_v1"
+    end
+
+    local reply_ok, reply_error =
+        gpt_ipc_probe_write_reply(request_id, status, text)
+    if reply_ok then
+        gpt_ipc_probe_emit(marker, "ipc_probe_reply_written", request_id)
+    else
+        gpt_ipc_probe_emit(marker, "ipc_probe_reply_write_failed", reply_error)
+    end
+end
