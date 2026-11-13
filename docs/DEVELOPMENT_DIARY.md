@@ -964,3 +964,12 @@
 - Добавлен временный минимальный Lua probe `gpt_companion_ipc_probe.script`, подключённый только к `actor_binder:update` игрока с внутренним poll interval 500 мс. Он принимает только `v1 <id> ping`, не выполняет игровые команды и возвращает фиксированный pong. NPC update, `xr_motivator.script`, squad save packet и actor save packet не менялись.
 - Добавлен `tools/gpt_companion_ipc_probe.py`: внешний Python процесс разрешает `$app_data_root$` из `fsgame.ltx`, атомарно отправляет ping и ждёт ответ. Он не вызывает LLM и использует только стандартную библиотеку Python.
 - Добавлены `docs/IPC_PROBE_TEST.md` и уточнён план M1. Статус: файлы и тестовый протокол подготовлены; структурный анализ/проверка исполнения не заменяют компиляцию и обязательный round-trip на компьютере пользователя.
+
+
+### Статическая проверка M1 probe — 2026-11-14
+
+- Python-скрипт прошёл AST parsing; на временных каталогах проверены разрешение `$app_data_root$` из тестового `fsgame.ltx` в CP1251 с кириллическим именем папки, запись через writable file handle + flush/fsync и атомарный replace.
+- Python request/response loop прошёл изолированный round-trip с имитированным Lua-процессом. Это проверяет логику отправителя/парсера, но не поведение настоящего X-Ray.
+- Лексический block-balance анализ нового Lua probe (170 строк) и текущего `bind_stalker.script` прошёл. Локальный Lua/LuaJIT compiler в этой среде не найден; это не Lua compilation.
+- Diff проверен: изменения игровых исходников ограничены `bind_stalker.script` и новым временным `gpt_companion_ipc_probe.script`; `xr_motivator.script`, `sim_squad_scripted.script`, actor save/load packet и NPC update paths не менялись.
+- Следующий критерий M1 — реальный ping round-trip в оригинальном CoP 1.6.02 по [IPC_PROBE_TEST.md](IPC_PROBE_TEST.md). До этого не заявлять, что транспорт runtime-проверен.
