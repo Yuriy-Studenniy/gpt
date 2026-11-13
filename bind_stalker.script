@@ -508,7 +508,7 @@ local function gpt_ipc_probe_write_reply(request_id)
 
 	local write_ok, write_error = pcall(function()
 		local wrote, write_message = file:write(
-			"v1 ", request_id, " ok pong_gpt_companion_ipc_probe_v1\\n"
+			"v1 ", request_id, " ok pong_gpt_companion_ipc_probe_v1\n"
 		)
 		if not wrote then
 			error(write_message or "reply_write_failed")
