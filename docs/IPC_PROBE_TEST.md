@@ -34,11 +34,48 @@ Python записывает одну безопасную команду `ping` 
 
 ## Диагностика
 
-Новая версия Lua создаёт в `$app_data_root$` файл `gpt_companion_ipc_status.txt`.
+Новая версия Lua создаёт в `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
 
-- `state=lua_hook_active` означает, что встроенный обработчик исполняется и инициализировал пути.
-- `detail=command_path=...` показывает путь, который X-Ray использует для файла команды.
-- `state=command_received` означает, что Lua забрала команду.
+Статус: подготовлен диагностический smoke-test; игровой round-trip ещё не подтверждён.
+Ветка: `world-model-completion`.
+
+## Что проверяем
+
+Python записывает одну безопасную команду `ping` в `$app_data_root$`. Обработчик в `bind_stalker.script` читает её и возвращает ответ с тем же request ID. Никакие игровые действия не выполняются; LLM, HTTP, сокеты и сторонние Python-пакеты не используются.
+
+Запрос: `v1 <request_id> ping`
+
+Ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
+
+## Установка
+
+1. Закрой игру.
+2. Сохрани резервную копию:
+   - `gamedata/scripts/bind_stalker.script`;
+   - тестового сохранения.
+3. Скачай актуальный `bind_stalker.script` из этой ветки и замени им файл в `gamedata/scripts/`.
+4. Старый `gpt_companion_ipc_probe.script`, если ты уже его установил, можно оставить. Новая версия его не использует: код тестового обработчика встроен непосредственно в `bind_stalker.script`.
+5. Python-файл `tools/gpt_companion_ipc_probe.py` в папку игры не копируй.
+
+## Запуск
+
+1. Запусти CoP 1.6.02 и загрузи сохранение.
+2. Пока игра остаётся запущенной в загруженном мире, запусти из PowerShell:
+
+   ```powershell
+   python "C:\ПУТЬ\К\gpt_companion_ipc_probe.py" --game-root "D:\ПУТЬ\К\Call of Pripyat"
+   ```
+
+3. Lua проверяет командный файл не чаще раза в 500 мс.
+
+## Диагностика
+
+ файл `gpt_companion_ipc_status.txt`.
+
+- `state=lua_hook_active` означает, что встроенный обработчик исполняется и инициализировал пути; в idle этот статус может сохраняться.
+- `detail=command_path=...` показывает фактический путь X-Ray к файлу команды.
+- `state=command_open_failed` и `detail=error=...; path=...` означают, что `io.open` не смог открыть командный файл; текст ошибки и путь нужны для диагностики.
+- `state=command_received` означает, что Lua прочитала команду.
 - `state=reply_written` означает, что Lua сформировала ответ.
 
 При тайм-ауте Python сам выведет содержимое status-файла. Если файл состояния не появился, обработчик не дошёл до инициализации IPC либо Lua I/O недоступен.
