@@ -1251,6 +1251,19 @@ function actor_binder:update(delta)
 	if string.find(command_line(), "-designer") then
 		return
 	end
+	if not self.gpt_ipc_probe_notice_shown then
+		self.gpt_ipc_probe_notice_shown = true
+		local io_open_available = type(io) == "table" and type(io.open) == "function"
+		local fs_available = type(getFS) == "function"
+		local notice = "GPT IPC: actor update active; io.open="
+			.. tostring(io_open_available) .. "; getFS=" .. tostring(fs_available)
+		if type(news_manager) == "table" and type(news_manager.send_tip) == "function" then
+			pcall(function()
+				news_manager.send_tip(self.object, notice, nil, nil, 6000)
+			end)
+		end
+	end
+
 
 	-- Run the IPC smoke-test before any other per-frame game logic. This lets
 	-- the status file prove whether actor_binder:update is actually executing.
