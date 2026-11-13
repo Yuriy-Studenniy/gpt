@@ -1198,6 +1198,17 @@ function actor_binder:update(delta)
 		printf("[GPT_WORLD] Knowledge update failed safely: %s", tostring(world_knowledge_error))
 	end
 
+	-- Temporary one-shot file IPC probe; throttled internally to 500 ms.
+	if not self.gpt_ipc_probe_module_failed then
+		local ipc_probe_ok, ipc_probe_error = pcall(function()
+			gpt_companion_ipc_probe.update(time_global(), gpt_world_snapshot_marker)
+		end)
+		if not ipc_probe_ok then
+			self.gpt_ipc_probe_module_failed = true
+			gpt_world_snapshot_marker("ipc_probe_outer_failed", string.sub(tostring(ipc_probe_error), 1, 48))
+		end
+	end
+
 	local poi_knowledge_call_ok, poi_knowledge_error =
 		pcall(gpt_update_companion_poi_knowledge, self, time_global())
 	if not poi_knowledge_call_ok then
