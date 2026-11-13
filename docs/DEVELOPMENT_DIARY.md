@@ -953,3 +953,14 @@
 - Предварительный кандидат для MVP — одна SQLite БД с обычными индексами и FTS5 при подтверждённой поддержке; vector DB/embeddings не внедрять до доказанной необходимости на retrieval тестах.
 - Конкретный IPC до внешнего runtime не выбран: в оригинальном retail X-Ray нельзя предполагать наличие Lua HTTP/socket API без отдельного технического spike.
 - Создан `docs/MEMORY_IMPLEMENTATION_PLAN.md` с аудитом, минимальной моделью данных, быстрым request path и этапами M0–M6. Это план и архитектурная спецификация; игрового кода, LLM интеграции и памяти в runtime ещё нет.
+
+
+## 2026-11-14 — Подготовка M1: file-based IPC probe для retail CoP
+
+- Проверены `gui-AI` и `MSC-port`: GUI v5 хранит простые facts в `memory.json` и генерирует короткую сессионную сводку из последних шести реплик каждые шесть новых сообщений; устойчивого журнала диалога нет. MSC AgentLoop держит ограниченную историю текущей задачи в RAM и TaskManager progress, но не реализует общую долговременную память.
+- Из MSC-port полезен шаблон внешнего runtime: локальный Python service, request/response HTTP через фоновые C# worker threads и очереди, не блокирующие игровой поток. Unity bridge нельзя переносить в X-Ray как есть.
+- Найден внешний CoP companion-проект с file protocol в `$app_data_root$`: request/reply, временные файлы, rename, ID и polling из actor binder. В заголовке скрипта указаны io/os и API, а README включает CoP 1.6.02. Это сильный архитектурный кандидат, но не подтверждение для нашей установки.
+- В `lua_help.script` нашей ветки подтверждены `getFS()` и FS `update_path(string, string)`; явные HTTP/socket bindings не обнаружены. Стандартные `io/os` и фактическая атомарность rename должны быть подтверждены round-trip тестом в retail CoP.
+- Добавлен временный минимальный Lua probe `gpt_companion_ipc_probe.script`, подключённый только к `actor_binder:update` игрока с внутренним poll interval 500 мс. Он принимает только `v1 <id> ping`, не выполняет игровые команды и возвращает фиксированный pong. NPC update, `xr_motivator.script`, squad save packet и actor save packet не менялись.
+- Добавлен `tools/gpt_companion_ipc_probe.py`: внешний Python процесс разрешает `$app_data_root$` из `fsgame.ltx`, атомарно отправляет ping и ждёт ответ. Он не вызывает LLM и использует только стандартную библиотеку Python.
+- Добавлены `docs/IPC_PROBE_TEST.md` и уточнён план M1. Статус: файлы и тестовый протокол подготовлены; структурный анализ/проверка исполнения не заменяют компиляцию и обязательный round-trip на компьютере пользователя.
