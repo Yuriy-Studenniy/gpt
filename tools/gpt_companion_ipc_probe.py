@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 import time
 import uuid
@@ -68,8 +67,10 @@ def resolve_app_data_root(game_root: Path) -> Path:
 
 
 def write_atomic(path_tmp: Path, path_final: Path, payload: str) -> None:
-    path_tmp.write_text(payload, encoding="ascii", newline="\n")
-    with path_tmp.open("rb") as handle:
+    # Flush the writable descriptor before exposing the complete final file.
+    with path_tmp.open("w", encoding="ascii", newline="\n") as handle:
+        handle.write(payload)
+        handle.flush()
         os.fsync(handle.fileno())
     os.replace(path_tmp, path_final)
 
