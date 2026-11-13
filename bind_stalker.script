@@ -1252,6 +1252,13 @@ function actor_binder:update(delta)
 		return
 	end
 
+	-- Run the IPC smoke-test before any other per-frame game logic. This lets
+	-- the status file prove whether actor_binder:update is actually executing.
+	local ipc_probe_ok, ipc_probe_error = pcall(gpt_companion_ipc_probe_update, time_global())
+	if not ipc_probe_ok then
+		gpt_world_snapshot_marker("ipc_probe_outer_failed", string.sub(tostring(ipc_probe_error), 1, 48))
+	end
+
 	if self.already_jumped==false and jump_level.need_jump==true and (device().frame > self.spawn_frame+2000) then
 		jump_level.try_to_jump()
 		self.already_jumped = true
@@ -1388,12 +1395,6 @@ function actor_binder:update(delta)
 	if not world_knowledge_call_ok then
 		gpt_world_snapshot_marker("knowledge_update_outer_failed")
 		printf("[GPT_WORLD] Knowledge update failed safely: %s", tostring(world_knowledge_error))
-	end
-
-	-- Temporary one-shot file IPC probe; the code lives in this already-loaded file.
-	local ipc_probe_ok, ipc_probe_error = pcall(gpt_companion_ipc_probe_update, time_global())
-	if not ipc_probe_ok then
-		gpt_world_snapshot_marker("ipc_probe_outer_failed", string.sub(tostring(ipc_probe_error), 1, 48))
 	end
 
 	local poi_knowledge_call_ok, poi_knowledge_error =
