@@ -20,6 +20,7 @@ PROTOCOL = "v1"
 COMMAND_NAME = "gpt_companion_ipc_cmd.txt"
 COMMAND_TMP_NAME = "gpt_companion_ipc_cmd.tmp"
 REPLY_NAME = "gpt_companion_ipc_reply.txt"
+STATUS_NAME = "gpt_companion_ipc_status.txt"
 
 
 def resolve_app_data_root(game_root: Path) -> Path:
@@ -102,6 +103,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
     command_path = app_data_root / COMMAND_NAME
     command_tmp = app_data_root / COMMAND_TMP_NAME
     reply_path = app_data_root / REPLY_NAME
+    status_path = app_data_root / STATUS_NAME
 
     if command_path.exists():
         print(
@@ -114,6 +116,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
     try:
         command_tmp.unlink(missing_ok=True)
         reply_path.unlink(missing_ok=True)
+        status_path.unlink(missing_ok=True)
     except OSError as exc:
         print(f"Не удалось очистить старые файлы IPC: {exc}", file=sys.stderr)
         return 2
@@ -161,11 +164,22 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         pass
 
     print(
-        "Тайм-аут: игра не вернула pong. Проверь, что CoP запущен, "
-        "загружена игра, установлены оба Lua-файла и нет Lua-ошибок.",
+        "Тайм-аут: игра не вернула pong. Проверь состояние Lua hook ниже.",
         file=sys.stderr,
     )
     print(f"$app_data_root$: {app_data_root}", file=sys.stderr)
+    try:
+        if status_path.is_file():
+            print("Состояние Lua hook:", file=sys.stderr)
+            print(status_path.read_text(encoding="utf-8", errors="replace").strip(), file=sys.stderr)
+        else:
+            print(
+                "Файл состояния Lua hook не создан: обработчик из bind_stalker.script "
+                "не дошёл до инициализации IPC (или Lua I/O недоступен).",
+                file=sys.stderr,
+            )
+    except OSError as exc:
+        print(f"Не удалось прочитать состояние Lua hook: {exc}", file=sys.stderr)
     return 1
 
 
