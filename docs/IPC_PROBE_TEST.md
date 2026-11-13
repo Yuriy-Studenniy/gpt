@@ -1,346 +1,46 @@
 # M1 — проверка файлового IPC с оригинальным CoP 1.6.02
 
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
+Статус: подготовлен диагностический smoke-test; игровой round-trip ещё не подтверждён.
+Ветка: `world-model-completion`.
 
 ## Что проверяем
 
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
+Python записывает одну безопасную команду `ping` в `$app_data_root$`. Обработчик в `bind_stalker.script` читает её и возвращает ответ с тем же request ID. Никакие игровые действия не выполняются; LLM, HTTP, сокеты и сторонние Python-пакеты не используются.
 
-Протокол намеренно минимальный:
+Запрос: `v1 <request_id> ping`
 
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
+Ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
 
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
+## Установка
 
-## Установка временного probe
+1. Закрой игру.
+2. Сохрани резервную копию:
+   - `gamedata/scripts/bind_stalker.script`;
+   - тестового сохранения.
+3. Скачай актуальный `bind_stalker.script` из этой ветки и замени им файл в `gamedata/scripts/`.
+4. Старый `gpt_companion_ipc_probe.script`, если ты уже его установил, можно оставить. Новая версия его не использует: код тестового обработчика встроен непосредственно в `bind_stalker.script`.
+5. Python-файл `tools/gpt_companion_ipc_probe.py` в папку игры не копируй.
 
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
+## Запуск
 
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   Укажи реальную папку игры, где лежат `xrEngine.exe` и `fsgame.ltx`. Скрипт сам разбирает `fsgame.ltx` и разрешает `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
-
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
+1. Запусти CoP 1.6.02 и загрузи сохранение.
+2. Пока игра остаётся запущенной в загруженном мире, запусти из PowerShell:
 
    ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
+   python "C:\ПУТЬ\К\gpt_companion_ipc_probe.py" --game-root "D:\ПУТЬ\К\Call of Pripyat"
    ```
 
-   ; поддерживаются UTF-8 и типичные ANSI-кодировки Windows (CP1251/CP1252). Если это не сработает, найди значение alias `$app_data_root$` в `fsgame.ltx` и передай его напрямую через `--app-data-root "ПОЛНЫЙ\ПУТЬ"`.
-3. Python создаст `gpt_companion_ipc_cmd.tmp`, переименует его в `gpt_companion_ipc_cmd.txt` и будет ждать ответ до 45 секунд.
-4. Игровой actor binder проверяет командный файл не чаще раза в 500 мс. После получения ping Lua создаёт `gpt_companion_ipc_reply.tmp` и переименовывает его в `gpt_companion_ipc_reply.txt`.
+3. Lua проверяет командный файл не чаще раза в 500 мс.
 
-## Ожидаемый результат
+## Диагностика
 
-В терминале:
+Новая версия Lua создаёт в `$app_data_root$` файл `gpt_companion_ipc_status.txt`.
 
-```text
-IPC ROUND-TRIP OK
-Python -> файл команды -> Lua в CoP -> файл ответа -> Python
-```
+- `state=lua_hook_active` означает, что встроенный обработчик исполняется и инициализировал пути.
+- `detail=command_path=...` показывает путь, который X-Ray использует для файла команды.
+- `state=command_received` означает, что Lua забрала команду.
+- `state=reply_written` означает, что Lua сформировала ответ.
 
-При первом вызове обработчика Lua создаёт `gpt_companion_ipc_status.txt` в `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
+При тайм-ауте Python сам выведет содержимое status-файла. Если файл состояния не появился, обработчик не дошёл до инициализации IPC либо Lua I/O недоступен.
 
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   Укажи реальную папку игры, где лежат `xrEngine.exe` и `fsgame.ltx`. Скрипт сам разбирает `fsgame.ltx` и разрешает `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
-
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   ; поддерживаются UTF-8 и типичные ANSI-кодировки Windows (CP1251/CP1252). Если это не сработает, найди значение alias `$app_data_root$` в `fsgame.ltx` и передай его напрямую через `--app-data-root "ПОЛНЫЙ\ПУТЬ"`.
-3. Python создаст `gpt_companion_ipc_cmd.tmp`, переименует его в `gpt_companion_ipc_cmd.txt` и будет ждать ответ до 45 секунд.
-4. Игровой actor binder проверяет командный файл не чаще раза в 500 мс. После получения ping Lua создаёт `gpt_companion_ipc_reply.tmp` и переименовывает его в `gpt_companion_ipc_reply.txt`.
-
-## Ожидаемый результат
-
-В терминале:
-
-```text
-IPC ROUND-TRIP OK
-Python -> файл команды -> Lua в CoP -> файл ответа -> Python
-```
-
- со статусом `lua_hook_active`, а после команды — `command_received` и `reply_written`. Если Python завершится по тайм-ауту, новая версия скрипта сама покажет содержимое этого файла или сообщит, что файл состояния не создан.
-
-В игровом логе ожидаются диагностические записи с окончаниями:
-
-- `ipc_probe_command_received_<id>`
-- `ipc_probe_reply_written_<id>`
-
-Они могут выглядеть как `Unknown command: gpt_companion_diag_world_snapshot_ipc_probe_...`; для этого проекта такой вывод — ожидаемый канал диагностических маркеров.
-
-## Если тест не прошёл
-
-- Не продолжай менять файлы наугад. Сохрани вывод Python и последние строки `xray_administrator.log`.
-- `ipc_probe_standard_io_unavailable` означает, что стандартные Lua `io/os` функции не доступны в этом runtime. Если файл состояния показывает `lua_hook_active`, но команда остаётся, сравни `detail=command_path` с путём `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
-
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   Укажи реальную папку игры, где лежат `xrEngine.exe` и `fsgame.ltx`. Скрипт сам разбирает `fsgame.ltx` и разрешает `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
-
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   ; поддерживаются UTF-8 и типичные ANSI-кодировки Windows (CP1251/CP1252). Если это не сработает, найди значение alias `$app_data_root$` в `fsgame.ltx` и передай его напрямую через `--app-data-root "ПОЛНЫЙ\ПУТЬ"`.
-3. Python создаст `gpt_companion_ipc_cmd.tmp`, переименует его в `gpt_companion_ipc_cmd.txt` и будет ждать ответ до 45 секунд.
-4. Игровой actor binder проверяет командный файл не чаще раза в 500 мс. После получения ping Lua создаёт `gpt_companion_ipc_reply.tmp` и переименовывает его в `gpt_companion_ipc_reply.txt`.
-
-## Ожидаемый результат
-
-В терминале:
-
-```text
-IPC ROUND-TRIP OK
-Python -> файл команды -> Lua в CoP -> файл ответа -> Python
-```
-
-При первом вызове обработчика Lua создаёт `gpt_companion_ipc_status.txt` в `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
-
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   Укажи реальную папку игры, где лежат `xrEngine.exe` и `fsgame.ltx`. Скрипт сам разбирает `fsgame.ltx` и разрешает `$app_data_root# M1 — проверка файлового IPC с оригинальным CoP 1.6.02
-
-Статус: probe подготовлен; игровой round-trip ещё не подтверждён  
-Ветка: `world-model-completion`
-
-## Что проверяем
-
-Внешний Python-процесс отправляет тестовую строку в пользовательский каталог игры `$app_data_root$`. Скрипт Lua в CoP забирает команду из файла, формирует ответ и публикует его через временный файл + rename. Python должен получить ответ с тем же request ID.
-
-Протокол намеренно минимальный:
-
-- запрос: `v1 <request_id> ping`
-- ответ: `v1 <request_id> ok pong_gpt_companion_ipc_probe_v1`
-
-Никакая LLM, HTTP, socket, DLL или база данных в этом тесте не используется. Lua принимает только `ping`; произвольное выполнение команд невозможно.
-
-## Установка временного probe
-
-1. Сделай резервную копию текущего `gamedata/scripts/bind_stalker.script` и тестового сохранения.
-2. Из ветки `world-model-completion` скопируй:
-   - `bind_stalker.script` → `gamedata/scripts/bind_stalker.script`;
-   - `gpt_companion_ipc_probe.script` → `gamedata/scripts/gpt_companion_ipc_probe.script`.
-3. Остальные игровые файлы не меняй. Файл `tools/gpt_companion_ipc_probe.py` в игру не копируется.
-
-## Запуск round-trip
-
-1. Запусти оригинальный Call of Pripyat 1.6.02 и загрузи сохранение или новую игру. Дождись появления игрового мира.
-2. На компьютере с игрой открой терминал в корне репозитория/скачанной копии и выполни:
-
-   ```powershell
-   python tools/gpt_companion_ipc_probe.py --game-root "C:\ПУТЬ\К\Call of Pripyat"
-   ```
-
-   ; поддерживаются UTF-8 и типичные ANSI-кодировки Windows (CP1251/CP1252). Если это не сработает, найди значение alias `$app_data_root$` в `fsgame.ltx` и передай его напрямую через `--app-data-root "ПОЛНЫЙ\ПУТЬ"`.
-3. Python создаст `gpt_companion_ipc_cmd.tmp`, переименует его в `gpt_companion_ipc_cmd.txt` и будет ждать ответ до 45 секунд.
-4. Игровой actor binder проверяет командный файл не чаще раза в 500 мс. После получения ping Lua создаёт `gpt_companion_ipc_reply.tmp` и переименовывает его в `gpt_companion_ipc_reply.txt`.
-
-## Ожидаемый результат
-
-В терминале:
-
-```text
-IPC ROUND-TRIP OK
-Python -> файл команды -> Lua в CoP -> файл ответа -> Python
-```
-
- со статусом `lua_hook_active`, а после команды — `command_received` и `reply_written`. Если Python завершится по тайм-ауту, новая версия скрипта сама покажет содержимое этого файла или сообщит, что файл состояния не создан.
-
-В игровом логе ожидаются диагностические записи с окончаниями:
-
-- `ipc_probe_command_received_<id>`
-- `ipc_probe_reply_written_<id>`
-
-Они могут выглядеть как `Unknown command: gpt_companion_diag_world_snapshot_ipc_probe_...`; для этого проекта такой вывод — ожидаемый канал диагностических маркеров.
-
-## Если тест не прошёл
-
-- Не продолжай менять файлы наугад. Сохрани вывод Python и последние строки `xray_administrator.log`.
--  из Python: это выявит расхождение путей.
-- `ipc_probe_path_init_failed_...` означает, что не разрешился `$app_data_root$` или не сработал `getFS():update_path()`.
-- Python timeout при отсутствии Lua marker может означать, что binder hook не запущен, скрипт не загрузился или путь `$app_data_root$` отличается.
-- Lua marker `command_received` без `reply_written` укажет на проблему записи ответа/rename.
-
-После round-trip probe следует удалить или отключить. Это не production memory service и не доказательство работы LLM или долговременной памяти.
+После успешного round-trip временный обработчик нужно будет удалить или заменить производственным транспортом. Успешный ping подтверждает только файловый канал связи, но не работу LLM или долговременной памяти.
