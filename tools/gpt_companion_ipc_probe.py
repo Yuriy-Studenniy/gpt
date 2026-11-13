@@ -183,7 +183,17 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
     return 1
 
 
+def configure_console_output() -> None:
+    """Avoid UnicodeEncodeError when Python runs inside a Windows PowerShell job."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="backslashreplace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
 def main() -> int:
+    configure_console_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--game-root",
