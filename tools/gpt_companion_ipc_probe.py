@@ -28,10 +28,19 @@ def resolve_app_data_root(game_root: Path) -> Path:
     if not fsgame_path.is_file():
         raise FileNotFoundError(f"Не найден fsgame.ltx: {fsgame_path}")
 
+    raw_fsgame = fsgame_path.read_bytes()
+    fsgame_text = None
+    for encoding in ("utf-8-sig", "cp1251", "cp1252"):
+        try:
+            fsgame_text = raw_fsgame.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if fsgame_text is None:
+        raise UnicodeError("Не удалось прочитать fsgame.ltx как UTF-8 или ANSI")
+
     aliases: dict[str, tuple[str, str]] = {}
-    for raw_line in fsgame_path.read_text(
-        encoding="utf-8", errors="replace"
-    ).splitlines():
+    for raw_line in fsgame_text.splitlines():
         line = raw_line.split(";", 1)[0].strip()
         if not line or "=" not in line:
             continue
