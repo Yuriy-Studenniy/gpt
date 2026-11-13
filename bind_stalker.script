@@ -502,39 +502,57 @@ local function gpt_ipc_probe_initialize_paths()
 end
 
 local function gpt_ipc_probe_write_reply(request_id)
-	local open_ok, file = pcall(io.open, GPT_IPC_PROBE_REPLY_TMP_PATH, "w")
-	if not open_ok or file == nil then
-		return false, "reply_open_failed"
+	gpt_ipc_probe_write_status("reply_opening", GPT_IPC_PROBE_REPLY_TMP_PATH)
+	local open_call_ok, file, open_error =
+		pcall(io.open, GPT_IPC_PROBE_REPLY_TMP_PATH, "w")
+	if not open_call_ok then
+		return false, "reply_open_exception=" .. tostring(file)
 	end
+	if file == nil then
+		return false, "reply_open_failed=" .. tostring(open_error)
+	end
+	gpt_ipc_probe_write_status("reply_tmp_opened")
 
-	local write_ok, write_error = pcall(function()
-		local wrote, write_message = file:write(
+	local write_call_ok, wrote, write_message = pcall(function()
+		return file:write(
 			"v1 ", request_id, " ok pong_gpt_companion_ipc_probe_v1\n"
 		)
-		if not wrote then
-			error(write_message or "reply_write_failed")
-		end
-		local flushed, flush_message = file:flush()
-		if not flushed then
-			error(flush_message or "reply_flush_failed")
-		end
-		local closed, close_message = file:close()
-		if not closed then
-			error(close_message or "reply_close_failed")
-		end
 	end)
-	if not write_ok then
+	if not write_call_ok or wrote == nil then
 		pcall(function() file:close() end)
-		return false, tostring(write_error)
+		return false, "reply_write_failed=" .. tostring(write_message or wrote)
 	end
+	gpt_ipc_probe_write_status("reply_tmp_written")
+
+	local flush_call_ok, flushed, flush_message = pcall(function()
+		return file:flush()
+	end)
+	if not flush_call_ok or flushed == nil then
+		pcall(function() file:close() end)
+		return false, "reply_flush_failed=" .. tostring(flush_message or flushed)
+	end
+	gpt_ipc_probe_write_status("reply_tmp_flushed")
+
+	local close_call_ok, closed, close_message = pcall(function()
+		return file:close()
+	end)
+	if not close_call_ok or closed == nil then
+		pcall(function() file:close() end)
+		return false, "reply_close_failed=" .. tostring(close_message or closed)
+	end
+	gpt_ipc_probe_write_status("reply_tmp_closed")
 
 	pcall(os.remove, GPT_IPC_PROBE_REPLY_PATH)
-	local rename_ok, rename_result = pcall(
-		os.rename, GPT_IPC_PROBE_REPLY_TMP_PATH, GPT_IPC_PROBE_REPLY_PATH
-	)
-	if not rename_ok or rename_result == nil then
-		return false, "reply_rename_failed"
+	gpt_ipc_probe_write_status("reply_rename_started", GPT_IPC_PROBE_REPLY_PATH)
+	local rename_call_ok, rename_result, rename_error =
+		pcall(os.rename, GPT_IPC_PROBE_REPLY_TMP_PATH, GPT_IPC_PROBE_REPLY_PATH)
+	if not rename_call_ok then
+		return false, "reply_rename_exception=" .. tostring(rename_result)
 	end
+	if rename_result == nil then
+		return false, "reply_rename_failed=" .. tostring(rename_error)
+	end
+	gpt_ipc_probe_write_status("reply_renamed", request_id)
 	return true, nil
 end
 
@@ -613,7 +631,13 @@ local function gpt_companion_ipc_probe_update(now)
 		return
 	end
 
-	local reply_ok, reply_error = gpt_ipc_probe_write_reply(request_id)
+	local reply_call_ok, reply_ok, reply_error =
+		pcall(gpt_ipc_probe_write_reply, request_id)
+	if not reply_call_ok then
+		gpt_ipc_probe_write_status("reply_exception", tostring(reply_ok))
+		gpt_ipc_probe_emit("ipc_probe_reply_exception")
+		return
+	end
 	if reply_ok then
 		GPT_IPC_PROBE_HANDLED = true
 		gpt_ipc_probe_write_status("reply_written", request_id)
