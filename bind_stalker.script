@@ -431,6 +431,7 @@ local GPT_IPC_PROBE_POLL_MS = 500
 local GPT_IPC_PROBE_NEXT_POLL = 0
 local GPT_IPC_PROBE_HANDLED = false
 local GPT_IPC_PROBE_DISABLED = false
+local GPT_IPC_PROBE_LAST_OPEN_ERROR = nil
 local GPT_IPC_PROBE_CMD_PATH = nil
 local GPT_IPC_PROBE_REPLY_TMP_PATH = nil
 local GPT_IPC_PROBE_REPLY_PATH = nil
@@ -456,7 +457,7 @@ local function gpt_ipc_probe_write_status(state, detail)
 	local write_ok = pcall(function()
 		file:write("state=", tostring(state), "\n")
 		if detail ~= nil then
-			file:write("detail=", string.gsub(tostring(detail), "[\\r\\n]+", " "), "\n")
+			file:write("detail=", string.gsub(tostring(detail), "[%c]+", " "), "\n")
 		end
 		file:close()
 	end)
@@ -560,16 +561,23 @@ local function gpt_companion_ipc_probe_update(now)
 		return
 	end
 
-	local open_ok, file = pcall(io.open, GPT_IPC_PROBE_CMD_PATH, "r")
+	local open_ok, file, open_error = pcall(io.open, GPT_IPC_PROBE_CMD_PATH, "r")
 	if not open_ok then
 		GPT_IPC_PROBE_DISABLED = true
-		gpt_ipc_probe_write_status("command_open_exception")
+		gpt_ipc_probe_write_status("command_open_exception", tostring(file))
 		gpt_ipc_probe_emit("ipc_probe_command_open_exception")
 		return
 	end
 	if file == nil then
+		local error_text = tostring(open_error or "unknown_io_error")
+		if GPT_IPC_PROBE_LAST_OPEN_ERROR ~= error_text then
+			GPT_IPC_PROBE_LAST_OPEN_ERROR = error_text
+			gpt_ipc_probe_write_status("command_open_failed", "error=" .. error_text .. "; path=" .. GPT_IPC_PROBE_CMD_PATH)
+			gpt_ipc_probe_emit("ipc_probe_command_open_failed")
+		end
 		return
 	end
+	GPT_IPC_PROBE_LAST_OPEN_ERROR = nil
 
 	local read_ok, line = pcall(function()
 		local value = file:read("*l")
