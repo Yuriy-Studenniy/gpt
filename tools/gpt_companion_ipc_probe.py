@@ -49,10 +49,14 @@ def resolve_app_data_root(game_root: Path) -> Path:
         if not (alias.startswith("$") and alias.endswith("$")):
             continue
         fields = [part.strip() for part in rhs.split("|")]
-        if len(fields) < 4:
+        # fsgame.ltx has two common root forms:
+        #   $alias$ = ...| $parent_alias$| relative\\
+        #   $alias$ = ...| C:\\absolute\\path\\
+        # The second form has only three fields after splitting.
+        if len(fields) < 3:
             continue
-        parent = fields[2].strip()
-        relative = fields[3].strip().strip('"').strip()
+        parent = fields[2].strip().strip('"').strip()
+        relative = fields[3].strip().strip('"').strip() if len(fields) >= 4 else ""
         aliases[alias] = (parent, relative)
 
     root = game_root.resolve()
@@ -65,8 +69,14 @@ def resolve_app_data_root(game_root: Path) -> Path:
         entry = aliases.get(alias)
         if entry is None:
             raise KeyError(f"Путь {alias} не найден в fsgame.ltx")
-        parent_alias, relative = entry
-        base = resolve(parent_alias, seen | {alias}) if parent_alias else root
+        parent, relative = entry
+        if parent.startswith("$") and parent.endswith("$"):
+            base = resolve(parent, seen | {alias})
+        elif parent:
+            parent_path = Path(parent.replace("\\", os.sep).replace("/", os.sep))
+            base = parent_path if parent_path.is_absolute() else root / parent_path
+        else:
+            base = root
         if not relative:
             return base
         candidate = Path(relative.replace("\\", os.sep).replace("/", os.sep))
