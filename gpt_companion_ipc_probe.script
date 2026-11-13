@@ -53,7 +53,7 @@ local function gpt_ipc_probe_resolve_paths()
 end
 
 local function gpt_ipc_probe_write_reply(request_id, status, text)
-    local open_ok, file, open_error = pcall(
+    local open_ok, file = pcall(
         io.open,
         GPT_IPC_PROBE_REPLY_TMP_PATH,
         "w"
@@ -150,7 +150,6 @@ function gpt_companion_ipc_probe.update(now, marker)
         return
     end
 
-    GPT_IPC_PROBE_HANDLED = true
     gpt_ipc_probe_emit(marker, "ipc_probe_command_received", request_id)
 
     local status = "unsupported"
@@ -163,6 +162,7 @@ function gpt_companion_ipc_probe.update(now, marker)
     local reply_ok, reply_error =
         gpt_ipc_probe_write_reply(request_id, status, text)
     if reply_ok then
+        GPT_IPC_PROBE_HANDLED = true
         gpt_ipc_probe_emit(marker, "ipc_probe_reply_written", request_id)
     else
         gpt_ipc_probe_emit(marker, "ipc_probe_reply_write_failed", reply_error)
