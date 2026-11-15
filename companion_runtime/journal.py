@@ -173,15 +173,15 @@ class CompanionJournal:
                 "speaker должен быть одним из значений: " + ", ".join(sorted(ALLOWED_SPEAKERS))
             )
         if not isinstance(content, str):
-            raise JournalError("content должен быть строкой")
+            raise JournalError("поле content должно быть строкой")
         if len(content) > 200_000:
-            raise JournalError("content превышает лимит в 200000 символов")
+            raise JournalError("поле content превышает лимит в 200000 символов")
         source = _required_text(source, "source", 160)
         message_id = _required_text(message_id if message_id is not None else uuid.uuid4().hex, "message_id", 160)
         if metadata is None:
             metadata = {}
         if not isinstance(metadata, dict):
-            raise JournalError("metadata должен быть JSON-объектом")
+            raise JournalError("поле metadata должно быть JSON-объектом")
         try:
             metadata_json = json.dumps(
                 metadata,
@@ -305,12 +305,12 @@ class CompanionJournal:
     ) -> list[MessageRecord]:
         conversation_id = _required_text(conversation_id, "conversation_id", 160)
         if not isinstance(limit, int) or not 1 <= limit <= 500:
-            raise JournalError("limit должен быть целым числом от 1 до 500")
+            raise JournalError("поле limit должно быть целым числом от 1 до 500")
         sql = "SELECT * FROM messages WHERE conversation_id = ?"
         params: list[Any] = [conversation_id]
         if before_sequence is not None:
             if not isinstance(before_sequence, int) or before_sequence < 1:
-                raise JournalError("before_sequence должен быть положительным целым числом")
+                raise JournalError("поле before_sequence должно быть положительным целым числом")
             sql += " AND sequence < ?"
             params.append(before_sequence)
         sql += " ORDER BY sequence DESC LIMIT ?"
@@ -353,8 +353,8 @@ def _main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--db", type=Path, default=DEFAULT_DATABASE)
     commands = parser.add_subparsers(dest="command", required=True)
 
-    commands.add_parser("init", help="create the journal schema")
-    append = commands.add_parser("append", help="append one immutable message")
+    commands.add_parser("init", help="создать структуру базы данных")
+    append = commands.add_parser("append", help="добавить одно неизменяемое сообщение")
     append.add_argument("--conversation", required=True)
     append.add_argument("--scope", default="default")
     append.add_argument("--speaker", required=True, choices=sorted(ALLOWED_SPEAKERS))
@@ -363,11 +363,11 @@ def _main(argv: Optional[list[str]] = None) -> int:
     append.add_argument("--source", default="external_dialog")
     append.add_argument("--metadata-json", default="{}")
 
-    recent = commands.add_parser("recent", help="read recent messages")
+    recent = commands.add_parser("recent", help="прочитать последние сообщения")
     recent.add_argument("--conversation", required=True)
     recent.add_argument("--limit", type=int, default=20)
 
-    commands.add_parser("check", help="run SQLite integrity_check")
+    commands.add_parser("check", help="проверить целостность SQLite")
 
     args = parser.parse_args(argv)
     try:
