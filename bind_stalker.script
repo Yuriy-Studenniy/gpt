@@ -431,6 +431,8 @@ local GPT_IPC_PROBE_POLL_MS = 500
 local GPT_IPC_PROBE_NEXT_POLL = 0
 local GPT_IPC_PROBE_DISABLED = false
 local GPT_IPC_PROBE_LAST_OPEN_STATUS_MS = nil
+local GPT_IPC_PROBE_LAST_ERROR_STATUS_MS = nil
+local GPT_IPC_PROBE_LAST_HEARTBEAT_MS = nil
 local GPT_IPC_PROBE_CMD_PATH = nil
 local GPT_IPC_PROBE_REPLY_TMP_PATH = nil
 local GPT_IPC_PROBE_REPLY_PATH = nil
@@ -578,11 +580,28 @@ local function gpt_companion_ipc_probe_update(now)
 		return
 	end
 
+	if GPT_IPC_PROBE_LAST_HEARTBEAT_MS == nil
+		or now - GPT_IPC_PROBE_LAST_HEARTBEAT_MS >= 5000 then
+		GPT_IPC_PROBE_LAST_HEARTBEAT_MS = now
+		gpt_ipc_probe_write_status(
+			"poll_active",
+			"poll_ms=" .. tostring(now) .. "; command_path=" .. GPT_IPC_PROBE_CMD_PATH
+		)
+	end
+
 	local open_ok, file, open_error = pcall(io.open, GPT_IPC_PROBE_CMD_PATH, "r")
 	if not open_ok then
-		GPT_IPC_PROBE_DISABLED = true
-		gpt_ipc_probe_write_status("command_open_exception", tostring(file))
-		gpt_ipc_probe_emit("ipc_probe_command_open_exception")
+		local status_due = GPT_IPC_PROBE_LAST_ERROR_STATUS_MS == nil
+			or now - GPT_IPC_PROBE_LAST_ERROR_STATUS_MS >= 5000
+		if status_due then
+			GPT_IPC_PROBE_LAST_ERROR_STATUS_MS = now
+			gpt_ipc_probe_write_status(
+				"command_open_exception",
+				"error=" .. tostring(file) .. "; path=" .. GPT_IPC_PROBE_CMD_PATH
+					.. "; poll_ms=" .. tostring(now)
+			)
+			gpt_ipc_probe_emit("ipc_probe_command_open_exception")
+		end
 		return
 	end
 	if file == nil then
@@ -609,12 +628,15 @@ local function gpt_companion_ipc_probe_update(now)
 		file:close()
 		return value
 	end)
-	pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 	if not read_ok or type(line) ~= "string" then
-		gpt_ipc_probe_write_status("command_read_failed")
+		gpt_ipc_probe_write_status(
+			"command_read_failed",
+			"read_error=" .. tostring(line) .. "; path=" .. GPT_IPC_PROBE_CMD_PATH
+		)
 		gpt_ipc_probe_emit("ipc_probe_command_read_failed")
 		return
 	end
+	pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 	if #line > 160 then
 		gpt_ipc_probe_write_status("command_too_long")
 		gpt_ipc_probe_emit("ipc_probe_command_too_long")
