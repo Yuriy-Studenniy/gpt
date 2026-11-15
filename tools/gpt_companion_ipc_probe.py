@@ -92,7 +92,7 @@ def write_command(path: Path, payload: str) -> None:
     исключает расхождения X-Ray при обнаружении файла после os.replace().
     Режим x не позволяет затереть чужую или ещё не обработанную команду.
     """
-    with path.open("x", encoding="ascii", newline="\\n") as handle:
+    with path.open("x", encoding="ascii", newline="\n") as handle:
         handle.write(payload)
         handle.flush()
         os.fsync(handle.fileno())
@@ -116,7 +116,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         return 2
 
     request_id = uuid.uuid4().hex[:16]
-    command_line = f"{PROTOCOL} {request_id} ping\\n"
+    command_line = f"{PROTOCOL} {request_id} ping\n"
 
     try:
         # Публикуем непосредственно итоговый файл: без временного имени и os.replace().
