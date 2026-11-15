@@ -18,7 +18,6 @@ from pathlib import Path
 
 PROTOCOL = "v1"
 COMMAND_NAME = "gpt_companion_ipc_cmd.txt"
-COMMAND_TMP_NAME = "gpt_companion_ipc_cmd.tmp"
 REPLY_NAME = "gpt_companion_ipc_reply.txt"
 STATUS_NAME = "gpt_companion_ipc_status.txt"
 
@@ -86,13 +85,17 @@ def resolve_app_data_root(game_root: Path) -> Path:
     return resolve("$app_data_root$", set()).resolve()
 
 
-def write_atomic(path_tmp: Path, path_final: Path, payload: str) -> None:
-    # Сбросить буфер записи до публикации готового командного файла.
-    with path_tmp.open("w", encoding="ascii", newline="\n") as handle:
+def write_command(path: Path, payload: str) -> None:
+    """Создать итоговый файл команды напрямую, без переименования временного файла.
+
+    Такой способ повторяет уже проверенную ручную запись из PowerShell и
+    исключает расхождения X-Ray при обнаружении файла после os.replace().
+    Режим x не позволяет затереть чужую или ещё не обработанную команду.
+    """
+    with path.open("x", encoding="ascii", newline="\\n") as handle:
         handle.write(payload)
         handle.flush()
         os.fsync(handle.fileno())
-    os.replace(path_tmp, path_final)
 
 
 def run_probe(app_data_root: Path, timeout: float) -> int:
@@ -101,7 +104,6 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         return 2
 
     command_path = app_data_root / COMMAND_NAME
-    command_tmp = app_data_root / COMMAND_TMP_NAME
     reply_path = app_data_root / REPLY_NAME
     status_path = app_data_root / STATUS_NAME
 
@@ -113,18 +115,19 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         )
         return 2
 
-    try:
-        # Можно удалить только устаревший временный файл. Диагностику и ответ сохраняем.
-        command_tmp.unlink(missing_ok=True)
-    except OSError as exc:
-        print(f"Не удалось очистить временный файл команды: {exc}", file=sys.stderr)
-        return 2
-
     request_id = uuid.uuid4().hex[:16]
-    command_line = f"{PROTOCOL} {request_id} ping\n"
+    command_line = f"{PROTOCOL} {request_id} ping\\n"
 
     try:
-        write_atomic(command_tmp, command_path, command_line)
+        # Публикуем непосредственно итоговый файл: без временного имени и os.replace().
+        write_command(command_path, command_line)
+    except FileExistsError:
+        print(
+            f"Параллельно появилась необработанная команда: {command_path}. "
+            "Не перезаписываю её.",
+            file=sys.stderr,
+        )
+        return 2
     except OSError as exc:
         print(f"Не удалось записать IPC-команду: {exc}", file=sys.stderr)
         return 2
@@ -158,7 +161,17 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
     print("Тайм-аут ожидания ответа; запрос и диагностические файлы сохранены.", file=sys.stderr)
     print(f"request_id: {request_id}", file=sys.stderr)
     print(f"$app_data_root$: {app_data_root}", file=sys.stderr)
+    print(f"command_path: {command_path}", file=sys.stderr)
     print(f"command_still_present: {command_path.exists()}", file=sys.stderr)
+    try:
+        if command_path.is_file():
+            command_stat = command_path.stat()
+            command_contents = command_path.read_text(encoding="ascii", errors="replace").strip()
+            print(f"command_file_size: {command_stat.st_size}", file=sys.stderr)
+            print(f"command_file_mtime_ns: {command_stat.st_mtime_ns}", file=sys.stderr)
+            print(f"command_file_content: {command_contents}", file=sys.stderr)
+    except OSError as exc:
+        print(f"Не удалось проверить командный файл: {exc}", file=sys.stderr)
     try:
         if status_path.is_file():
             print("Состояние Lua:", file=sys.stderr)
