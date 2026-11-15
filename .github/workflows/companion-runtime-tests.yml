@@ -1,4 +1,4 @@
-name: Companion runtime tests
+name: Тесты внешнего Runtime
 
 on:
   push:
@@ -13,13 +13,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Получить исходный код
         uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Установить Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Compile Python modules
+      - name: Проверить синтаксис Python
         run: python -m compileall -q companion_runtime tools/gpt_companion_ipc_probe.py tests
-      - name: Run companion runtime tests
+      - name: Запустить тесты Runtime
         run: python -m unittest discover -s tests -p "test_*.py" -v
