@@ -74,6 +74,23 @@ class CompanionJournalTests(unittest.TestCase):
         self.assertEqual([row.sequence for row in recent], [4, 5])
         self.assertEqual([row.sequence for row in before], [1, 2, 3])
 
+    def test_idempotent_retry_cannot_cross_scope(self) -> None:
+        self.journal.append_message(
+            conversation_id="campaign-1",
+            scope_id="save-A",
+            speaker="player",
+            content="hello",
+            message_id="scope-retry",
+        )
+        with self.assertRaises(JournalError):
+            self.journal.append_message(
+                conversation_id="campaign-1",
+                scope_id="save-B",
+                speaker="player",
+                content="hello",
+                message_id="scope-retry",
+            )
+
     def test_scope_cannot_change_inside_conversation(self) -> None:
         self.journal.append_message(
             conversation_id="campaign-1",
