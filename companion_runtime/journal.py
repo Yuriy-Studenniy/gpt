@@ -122,7 +122,7 @@ class CompanionJournal:
                 CREATE TRIGGER IF NOT EXISTS messages_no_update
                 BEFORE UPDATE ON messages
                 BEGIN
-                    SELECT RAISE(ABORT, 'messages are append-only');
+                    SELECT RAISE(ABORT, 'сообщения доступны только для добавления');
                 END;
 
                 CREATE TRIGGER IF NOT EXISTS messages_no_delete
