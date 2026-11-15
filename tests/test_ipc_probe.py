@@ -33,7 +33,7 @@ class IpcProbeTests(unittest.TestCase):
                         command.unlink(missing_ok=True)
                         temp_reply = self.root / "gpt_companion_ipc_reply.tmp"
                         temp_reply.write_text(
-                            f"v1 {request_id} ok pong_gpt_companion_ipc_probe_v1\\n",
+                            f"v1 {request_id} ok pong_gpt_companion_ipc_probe_v1\n",
                             encoding="ascii",
                         )
                         os.replace(temp_reply, reply)
@@ -50,25 +50,25 @@ class IpcProbeTests(unittest.TestCase):
 
     def test_timeout_preserves_command_and_status(self) -> None:
         status = self.root / "gpt_companion_ipc_status.txt"
-        status.write_text("state=lua_hook_active\\n", encoding="ascii")
+        status.write_text("state=lua_hook_active\n", encoding="ascii")
 
         result = run_probe(self.root, timeout=0.1)
 
         command = self.root / "gpt_companion_ipc_cmd.txt"
         self.assertEqual(result, 1)
         self.assertTrue(command.exists())
-        self.assertEqual(status.read_text(encoding="ascii"), "state=lua_hook_active\\n")
+        self.assertEqual(status.read_text(encoding="ascii"), "state=lua_hook_active\n")
         self.assertEqual(len(command.read_text(encoding="ascii").strip().split()), 3)
         self.assertFalse((self.root / "gpt_companion_ipc_cmd.tmp").exists())
 
     def test_existing_pending_command_is_not_overwritten(self) -> None:
         command = self.root / "gpt_companion_ipc_cmd.txt"
-        command.write_text("v1 pending ping\\n", encoding="ascii")
+        command.write_text("v1 pending ping\n", encoding="ascii")
 
         result = run_probe(self.root, timeout=0.1)
 
         self.assertEqual(result, 2)
-        self.assertEqual(command.read_text(encoding="ascii"), "v1 pending ping\\n")
+        self.assertEqual(command.read_text(encoding="ascii"), "v1 pending ping\n")
 
 
 if __name__ == "__main__":
