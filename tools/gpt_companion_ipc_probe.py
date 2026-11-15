@@ -114,8 +114,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         return 2
 
     try:
-        # A stale .tmp is safe to remove: the final command path is the
-        # publication point. Keep reply/status files as diagnostic evidence.
+        # Only stale staging data is disposable. Keep status/reply evidence.
         command_tmp.unlink(missing_ok=True)
     except OSError as exc:
         print(f"Не удалось очистить временный файл команды: {exc}", file=sys.stderr)
@@ -130,7 +129,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         print(f"Не удалось записать IPC-команду: {exc}", file=sys.stderr)
         return 2
 
-    print(f"Команда отправлена в игру. Ожидаю ответ (до {timeout:.0f} с)...")
+    print(f"Команда отправлена в игру. ID={request_id}. Ожидаю ответ (до {timeout:.0f} с)...")
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
@@ -144,17 +143,18 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
                     if len(parts) == 4 and parts[0] == PROTOCOL and parts[1] == request_id:
                         if parts[2] == "ok" and parts[3] == "pong_gpt_companion_ipc_probe_v1":
                             print("IPC ROUND-TRIP OK")
-                            print("Python -> файл команды -> Lua в CoP -> файл ответа -> Python")
+                            print("Python -> command file -> CoP Lua -> reply file -> Python")
+                            print(f"request_id={request_id}")
                             return 0
                         print(f"Игра вернула неожиданный ответ: {lines[0]}", file=sys.stderr)
                         return 1
-        except (OSError, PermissionError):
-            # A transient read/replace race should not fail the probe.
+        except OSError:
+            # A transient read/rename race should not fail the probe.
             pass
         time.sleep(0.25)
 
-    # Keep the request and all diagnostic files. The game may have been paused
-    # while minimized and can still process this command after it resumes.
+    # Do not delete our request on timeout: the game may have been paused while
+    # minimized and can still consume the command after it resumes.
     print("Тайм-аут ожидания ответа; запрос и диагностические файлы сохранены.", file=sys.stderr)
     print(f"request_id: {request_id}", file=sys.stderr)
     print(f"$app_data_root$: {app_data_root}", file=sys.stderr)
@@ -169,12 +169,11 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         print(f"Не удалось прочитать Lua status: {exc}", file=sys.stderr)
     try:
         if reply_path.is_file():
-            print("Reply file (may contain a stale request ID):", file=sys.stderr)
+            print("Reply file (may contain another request ID):", file=sys.stderr)
             print(reply_path.read_text(encoding="ascii", errors="replace").strip(), file=sys.stderr)
     except OSError as exc:
         print(f"Не удалось прочитать reply: {exc}", file=sys.stderr)
     return 1
-
 
 def configure_console_output() -> None:
     """Avoid UnicodeEncodeError when Python runs inside a Windows PowerShell job."""
