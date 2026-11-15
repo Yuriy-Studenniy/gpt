@@ -547,8 +547,7 @@ local function gpt_companion_ipc_probe_update(now)
 		return
 	end
 	if type(io) ~= "table" or type(io.open) ~= "function"
-		or type(os) ~= "table" or type(os.remove) ~= "function"
-		or type(os.rename) ~= "function" then
+		or type(os) ~= "table" or type(os.remove) ~= "function" then
 		GPT_IPC_PROBE_DISABLED = true
 		gpt_ipc_probe_emit("ipc_probe_standard_io_unavailable")
 		return
