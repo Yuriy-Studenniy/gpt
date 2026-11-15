@@ -503,27 +503,26 @@ local function gpt_ipc_probe_initialize_paths()
 end
 
 local function gpt_ipc_probe_write_reply(request_id)
-	gpt_ipc_probe_write_status("reply_opening", GPT_IPC_PROBE_REPLY_TMP_PATH)
+	local payload = "v1 " .. request_id .. " ok pong_gpt_companion_ipc_probe_v1\\n"
+	gpt_ipc_probe_write_status("reply_opening", GPT_IPC_PROBE_REPLY_PATH)
 	local open_call_ok, file, open_error =
-		pcall(io.open, GPT_IPC_PROBE_REPLY_TMP_PATH, "w")
+		pcall(io.open, GPT_IPC_PROBE_REPLY_PATH, "w")
 	if not open_call_ok then
 		return false, "reply_open_exception=" .. tostring(file)
 	end
 	if file == nil then
 		return false, "reply_open_failed=" .. tostring(open_error)
 	end
-	gpt_ipc_probe_write_status("reply_tmp_opened")
+	gpt_ipc_probe_write_status("reply_file_opened", request_id)
 
 	local write_call_ok, wrote, write_message = pcall(function()
-		return file:write(
-			"v1 ", request_id, " ok pong_gpt_companion_ipc_probe_v1\n"
-		)
+		return file:write(payload)
 	end)
 	if not write_call_ok or wrote == nil then
 		pcall(function() file:close() end)
 		return false, "reply_write_failed=" .. tostring(write_message or wrote)
 	end
-	gpt_ipc_probe_write_status("reply_tmp_written")
+	gpt_ipc_probe_write_status("reply_payload_written", request_id)
 
 	local flush_call_ok, flushed, flush_message = pcall(function()
 		return file:flush()
@@ -532,7 +531,6 @@ local function gpt_ipc_probe_write_reply(request_id)
 		pcall(function() file:close() end)
 		return false, "reply_flush_failed=" .. tostring(flush_message or flushed)
 	end
-	gpt_ipc_probe_write_status("reply_tmp_flushed")
 
 	local close_call_ok, closed, close_message = pcall(function()
 		return file:close()
@@ -541,19 +539,6 @@ local function gpt_ipc_probe_write_reply(request_id)
 		pcall(function() file:close() end)
 		return false, "reply_close_failed=" .. tostring(close_message or closed)
 	end
-	gpt_ipc_probe_write_status("reply_tmp_closed")
-
-	pcall(os.remove, GPT_IPC_PROBE_REPLY_PATH)
-	gpt_ipc_probe_write_status("reply_rename_started", GPT_IPC_PROBE_REPLY_PATH)
-	local rename_call_ok, rename_result, rename_error =
-		pcall(os.rename, GPT_IPC_PROBE_REPLY_TMP_PATH, GPT_IPC_PROBE_REPLY_PATH)
-	if not rename_call_ok then
-		return false, "reply_rename_exception=" .. tostring(rename_result)
-	end
-	if rename_result == nil then
-		return false, "reply_rename_failed=" .. tostring(rename_error)
-	end
-	gpt_ipc_probe_write_status("reply_renamed", request_id)
 	return true, nil
 end
 
@@ -636,10 +621,10 @@ local function gpt_companion_ipc_probe_update(now)
 		gpt_ipc_probe_emit("ipc_probe_command_read_failed")
 		return
 	end
-	pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 	if #line > 160 then
 		gpt_ipc_probe_write_status("command_too_long")
 		gpt_ipc_probe_emit("ipc_probe_command_too_long")
+		pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 		return
 	end
 
@@ -650,6 +635,7 @@ local function gpt_companion_ipc_probe_update(now)
 		or #request_id > 40 then
 		gpt_ipc_probe_write_status("command_invalid", line)
 		gpt_ipc_probe_emit("ipc_probe_command_invalid")
+		pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 		return
 	end
 
@@ -657,9 +643,11 @@ local function gpt_companion_ipc_probe_update(now)
 	gpt_ipc_probe_emit("ipc_probe_command_received", request_id)
 	if command ~= "ping" then
 		gpt_ipc_probe_write_status("command_unsupported", command)
+		pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 		return
 	end
 
+	gpt_ipc_probe_write_status("reply_dispatch_started", request_id)
 	local reply_call_ok, reply_ok, reply_error =
 		pcall(gpt_ipc_probe_write_reply, request_id)
 	if not reply_call_ok then
@@ -668,11 +656,13 @@ local function gpt_companion_ipc_probe_update(now)
 		return
 	end
 	if reply_ok then
+		pcall(os.remove, GPT_IPC_PROBE_CMD_PATH)
 		gpt_ipc_probe_write_status("reply_written", request_id)
 		gpt_ipc_probe_emit("ipc_probe_reply_written", request_id)
 	else
-		gpt_ipc_probe_write_status("reply_write_failed", reply_error)
-		gpt_ipc_probe_emit("ipc_probe_reply_write_failed", reply_error)
+		local error_detail = reply_call_ok and reply_error or reply_ok
+		gpt_ipc_probe_write_status("reply_write_failed", error_detail)
+		gpt_ipc_probe_emit("ipc_probe_reply_write_failed", error_detail)
 	end
 end
 
