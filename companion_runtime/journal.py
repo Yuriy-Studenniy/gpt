@@ -80,11 +80,11 @@ class CompanionJournal:
             timeout=10.0,
             isolation_level=None,
         )
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA busy_timeout = 10000")
-        connection.execute("PRAGMA synchronous = NORMAL")
         try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA busy_timeout = 10000")
+            connection.execute("PRAGMA synchronous = NORMAL")
             yield connection
         finally:
             connection.close()
