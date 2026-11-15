@@ -50,10 +50,10 @@ def resolve_app_data_root(game_root: Path) -> Path:
         if not (alias.startswith("$") and alias.endswith("$")):
             continue
         fields = [part.strip() for part in rhs.split("|")]
-        # fsgame.ltx has two common root forms:
+        # В fsgame.ltx встречаются две формы корневого пути:
         #   $alias$ = ...| $parent_alias$| relative\\
         #   $alias$ = ...| C:\\absolute\\path\\
-        # The second form has only three fields after splitting.
+        # Во второй форме после разделения получается только три поля.
         if len(fields) < 3:
             continue
         parent = fields[2].strip().strip('"').strip()
@@ -142,8 +142,8 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
                     parts = lines[0].split(" ", 3)
                     if len(parts) == 4 and parts[0] == PROTOCOL and parts[1] == request_id:
                         if parts[2] == "ok" and parts[3] == "pong_gpt_companion_ipc_probe_v1":
-                            print("IPC ROUND-TRIP OK")
-                            print("Python -> command file -> CoP Lua -> reply file -> Python")
+                            print("ОБМЕН IPC УСПЕШЕН")
+                            print("Python -> файл команды -> Lua CoP -> файл ответа -> Python")
                             print(f"request_id={request_id}")
                             return 0
                         print(f"Игра вернула неожиданный ответ: {lines[0]}", file=sys.stderr)
@@ -161,7 +161,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
     print(f"command_still_present: {command_path.exists()}", file=sys.stderr)
     try:
         if status_path.is_file():
-            print("Lua status:", file=sys.stderr)
+            print("Состояние Lua:", file=sys.stderr)
             print(status_path.read_text(encoding="utf-8", errors="replace").strip(), file=sys.stderr)
         else:
             print("Lua status: отсутствует или ещё не создан.", file=sys.stderr)
@@ -169,7 +169,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         print(f"Не удалось прочитать Lua status: {exc}", file=sys.stderr)
     try:
         if reply_path.is_file():
-            print("Reply file (may contain another request ID):", file=sys.stderr)
+            print("Файл ответа (может содержать другой request ID):", file=sys.stderr)
             print(reply_path.read_text(encoding="ascii", errors="replace").strip(), file=sys.stderr)
     except OSError as exc:
         print(f"Не удалось прочитать reply: {exc}", file=sys.stderr)
