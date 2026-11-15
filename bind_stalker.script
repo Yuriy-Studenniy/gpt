@@ -503,7 +503,7 @@ local function gpt_ipc_probe_initialize_paths()
 end
 
 local function gpt_ipc_probe_write_reply(request_id)
-	local payload = "v1 " .. request_id .. " ok pong_gpt_companion_ipc_probe_v1\\n"
+	local payload = "v1 " .. request_id .. " ok pong_gpt_companion_ipc_probe_v1\n"
 	gpt_ipc_probe_write_status("reply_opening", GPT_IPC_PROBE_REPLY_PATH)
 	local open_call_ok, file, open_error =
 		pcall(io.open, GPT_IPC_PROBE_REPLY_PATH, "w")
