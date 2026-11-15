@@ -114,11 +114,11 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         return 2
 
     try:
+        # A stale .tmp is safe to remove: the final command path is the
+        # publication point. Keep reply/status files as diagnostic evidence.
         command_tmp.unlink(missing_ok=True)
-        reply_path.unlink(missing_ok=True)
-        status_path.unlink(missing_ok=True)
     except OSError as exc:
-        print(f"Не удалось очистить старые файлы IPC: {exc}", file=sys.stderr)
+        print(f"Не удалось очистить временный файл команды: {exc}", file=sys.stderr)
         return 2
 
     request_id = uuid.uuid4().hex[:16]
@@ -142,7 +142,6 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
                 if lines:
                     parts = lines[0].split(" ", 3)
                     if len(parts) == 4 and parts[0] == PROTOCOL and parts[1] == request_id:
-                        reply_path.unlink(missing_ok=True)
                         if parts[2] == "ok" and parts[3] == "pong_gpt_companion_ipc_probe_v1":
                             print("IPC ROUND-TRIP OK")
                             print("Python -> файл команды -> Lua в CoP -> файл ответа -> Python")
@@ -154,32 +153,26 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
             pass
         time.sleep(0.25)
 
-    # Remove only our own still-pending request; never delete another request.
-    try:
-        if command_path.is_file():
-            pending = command_path.read_text(encoding="ascii", errors="replace").strip()
-            if pending == command_line.strip():
-                command_path.unlink(missing_ok=True)
-    except OSError:
-        pass
-
-    print(
-        "Тайм-аут: игра не вернула pong. Проверь состояние Lua hook ниже.",
-        file=sys.stderr,
-    )
+    # Keep the request and all diagnostic files. The game may have been paused
+    # while minimized and can still process this command after it resumes.
+    print("Тайм-аут ожидания ответа; запрос и диагностические файлы сохранены.", file=sys.stderr)
+    print(f"request_id: {request_id}", file=sys.stderr)
     print(f"$app_data_root$: {app_data_root}", file=sys.stderr)
+    print(f"command_still_present: {command_path.exists()}", file=sys.stderr)
     try:
         if status_path.is_file():
-            print("Состояние Lua hook:", file=sys.stderr)
+            print("Lua status:", file=sys.stderr)
             print(status_path.read_text(encoding="utf-8", errors="replace").strip(), file=sys.stderr)
         else:
-            print(
-                "Файл состояния Lua hook не создан: обработчик из bind_stalker.script "
-                "не дошёл до инициализации IPC (или Lua I/O недоступен).",
-                file=sys.stderr,
-            )
+            print("Lua status: отсутствует или ещё не создан.", file=sys.stderr)
     except OSError as exc:
-        print(f"Не удалось прочитать состояние Lua hook: {exc}", file=sys.stderr)
+        print(f"Не удалось прочитать Lua status: {exc}", file=sys.stderr)
+    try:
+        if reply_path.is_file():
+            print("Reply file (may contain a stale request ID):", file=sys.stderr)
+            print(reply_path.read_text(encoding="ascii", errors="replace").strip(), file=sys.stderr)
+    except OSError as exc:
+        print(f"Не удалось прочитать reply: {exc}", file=sys.stderr)
     return 1
 
 
