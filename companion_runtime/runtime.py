@@ -19,7 +19,6 @@ from .journal import (
     SCHEMA_VERSION,
     CompanionJournal,
     JournalError,
-    _record_json,
 )
 
 
