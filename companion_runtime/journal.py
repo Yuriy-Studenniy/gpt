@@ -177,7 +177,7 @@ class CompanionJournal:
         if len(content) > 200_000:
             raise JournalError("content exceeds 200000 characters")
         source = _required_text(source, "source", 160)
-        message_id = _required_text(message_id or uuid.uuid4().hex, "message_id", 160)
+        message_id = _required_text(message_id if message_id is not None else uuid.uuid4().hex, "message_id", 160)
         if metadata is None:
             metadata = {}
         if not isinstance(metadata, dict):
@@ -202,6 +202,17 @@ class CompanionJournal:
                     (message_id,),
                 ).fetchone()
                 if existing is not None:
+                    existing_conversation = connection.execute(
+                        "SELECT scope_id FROM conversations WHERE conversation_id = ?",
+                        (conversation_id,),
+                    ).fetchone()
+                    if (
+                        existing_conversation is None
+                        or existing_conversation["scope_id"] != scope_id
+                    ):
+                        raise JournalError(
+                            f"conversation {conversation_id!r} does not belong to scope {scope_id!r}"
+                        )
                     same_payload = (
                         existing["conversation_id"] == conversation_id
                         and existing["speaker"] == speaker
