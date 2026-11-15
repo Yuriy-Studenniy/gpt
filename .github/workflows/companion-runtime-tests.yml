@@ -1,0 +1,25 @@
+name: Companion runtime tests
+
+on:
+  push:
+    branches:
+      - world-model-completion
+  pull_request:
+    branches:
+      - world-model-completion
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python modules
+        run: python -m compileall -q companion_runtime tools/gpt_companion_ipc_probe.py tests
+      - name: Run companion runtime tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
