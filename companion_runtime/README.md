@@ -1,59 +1,63 @@
-# Companion Runtime — M2 foundation
+# Companion Runtime — основа этапа M2
 
-The external Runtime is a separate Python process. This first vertical slice
-contains a durable journal and a JSON-lines process API. It has no game imports,
-network calls, LLM provider, or per-frame work.
+Внешний Companion Runtime — отдельный процесс Python. Первый рабочий срез
+содержит долговременный журнал SQLite и API обмена JSON-строками. В нём пока
+нет игровых импортов, сетевых запросов, подключения LLM или работы на каждом
+кадре игры.
 
-## Journal guarantees
+## Гарантии журнала
 
-- SQLite is the durable source of truth; messages are append-only.
-- Every message has a stable message ID, conversation ID, per-conversation
-  sequence, speaker, source, timestamp, content, and JSON metadata.
-- Retrying the same message ID and payload is idempotent and returns the
-  original sequence. Reusing an ID for different content is rejected.
-- SQLite uses WAL, foreign keys, a busy timeout, and a transaction around
-  sequence allocation plus insert.
-- Database triggers reject UPDATE and DELETE against the messages table.
-- The journal API supports append, get, recent reads, conversation metadata,
-  and an integrity check.
+- SQLite — долговременный источник истины; сообщения доступны только для
+  добавления, без перезаписи и удаления.
+- Каждое сообщение содержит стабильный ID, ID беседы, порядковый номер внутри
+  беседы, отправителя, источник, время, текст и JSON-метаданные.
+- Повторная отправка того же ID с теми же данными безопасна: возвращается
+  исходная запись и её порядковый номер. Повторное использование ID для другого
+  содержимого отклоняется.
+- SQLite использует WAL, внешние ключи, тайм-аут ожидания блокировки и транзакцию
+  при выдаче порядкового номера и записи сообщения.
+- Триггеры базы запрещают UPDATE и DELETE для таблицы сообщений.
+- API журнала поддерживает добавление, чтение по ID, получение последних
+  сообщений, сведения о беседе и проверку целостности базы.
 
-## Initialize the database
+## Инициализация базы
 
-From the repository root, run:
+Из корня репозитория:
 
     python -m companion_runtime.journal --db "data\companion_memory.sqlite3" init
 
-## Run the external Runtime
+## Запуск внешнего Runtime
 
     python -m companion_runtime.runtime --db "data\companion_memory.sqlite3"
 
-The process reads one JSON object per line from stdin and writes one JSON
-response per line to stdout. Every response echoes the request_id. Supported
-operations are health, append_message, get_message, list_messages,
-conversation_info, and integrity_check.
+Процесс читает по одному JSON-объекту в строке из stdin и пишет один JSON-ответ
+на строку в stdout. Каждый ответ возвращает тот же request_id. Поддерживаются
+операции health, append_message, get_message, list_messages,
+conversation_info и integrity_check.
 
-Example health request:
+Пример запроса проверки состояния:
 
     {"request_id":"health-001","op":"health","payload":{}}
 
-Example append request:
+Пример добавления сообщения:
 
-    {"request_id":"append-001","op":"append_message","payload":{"conversation_id":"campaign-main","scope_id":"save-slot-1","speaker":"player","content":"We agreed to visit Skadovsk tomorrow.","message_id":"message-001","source":"external_dialog","metadata":{}}}
+    {"request_id":"append-001","op":"append_message","payload":{"conversation_id":"campaign-main","scope_id":"save-slot-1","speaker":"player","content":"Договорились завтра посетить Скадовск.","message_id":"message-001","source":"external_dialog","metadata":{}}}
 
-Example recent read:
+Пример чтения последних сообщений:
 
     {"request_id":"recent-001","op":"list_messages","payload":{"conversation_id":"campaign-main","limit":20}}
 
-The process is intentionally stdio-only at M2. The filesystem bridge to X-Ray
-is a separate adapter and must not be mixed into database code.
+На этапе M2 процесс намеренно использует только stdin/stdout. Файловый мост к
+X-Ray — отдельный адаптер; его нельзя смешивать с кодом базы данных.
 
-## Tests
+## Тесты
 
-From the repository root, run:
+Из корня репозитория:
 
     python -m unittest discover -s tests -p "test_*.py" -v
 
-The suite covers persistence after reopening, order, idempotent retry, ID
-conflict, append-only triggers, bounded reads, scope consistency, concurrent
-sequence allocation, IPC reply matching/timeout recovery, JSON-lines request
-correlation, and continued service after malformed input.
+Набор проверяет восстановление после повторного открытия базы, порядок сообщений,
+идемпотентность повторной доставки, конфликт ID, запрет изменения/удаления,
+ограничение количества результатов, согласованность области сохранения,
+параллельную выдачу порядковых номеров, соответствие ID в IPC-ответе,
+сохранение команды при тайм-ауте и продолжение работы после некорректного JSON.
