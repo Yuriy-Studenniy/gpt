@@ -1,6 +1,6 @@
 # План реализации общей и личной памяти
 
-Статус на 2026-11-15: M0 завершён; файловый IPC подтверждён в retail CoP; M2 journal foundation добавлен, проверка автоматизированных тестов ожидается.
+Статус на 2026-11-15: M0 завершён; M1 file-based IPC подтверждён в retail CoP; M2 journal и JSON-lines Runtime реализованы как первый slice, CI/test result ещё не подтверждён.
 Ветка: world-model-completion.
 
 ## 1. Результат аудита M0
@@ -89,15 +89,17 @@ M1 считается подтверждённым по игровому тра�
 
 ## 7. Фактический статус M2
 
-Добавлен package companion_runtime и SQLite journal foundation:
-- conversations с scope_id и временными метками;
+Добавлен package companion_runtime и SQLite journal:
+- conversations со scope_id и временными метками;
 - append-only messages с message_id, conversation_id, sequence, speaker, content, source, timestamp и JSON metadata;
 - SQLite WAL, foreign keys, busy timeout, транзакционная выдача sequence;
 - повтор того же ID/payload идемпотентен; конфликт ID отклоняется;
 - DB triggers запрещают UPDATE/DELETE сообщений;
-- API append_message, get_message, list_messages, conversation_info, integrity_check и CLI init/append/recent/check.
+- API append_message, get_message, list_messages, conversation_info, integrity_check и CLI.
 
-Добавлены unit tests: восстановление после reopen, порядок, идемпотентность, conflict, append-only, ограниченное чтение, неизменность scope, конкурентные append и SQLite integrity; а также тесты Python IPC probe. Требуется прогнать tests в CI и исправлять конкретные падения. Пока не заявлять M2 завершённым: ещё нет runtime event loop, retrieval, provider adapter или связи журнала с игровым диалогом.
+Добавлен запускаемый JSON-lines process API (stdin/stdout) с request_id correlation и операциями health, append_message, get_message, list_messages, conversation_info, integrity_check. Runtime не импортирует игровые bindings, не вызывает сеть или LLM и не выполняет работу на игровом тике.
+
+Добавлены unit tests: восстановление после reopen, порядок, идемпотентность, conflict, append-only, ограниченное чтение, неизменность scope, конкурентные append и SQLite integrity; тесты Python IPC probe; тесты JSON-lines request correlation, append/retry/read и устойчивости к некорректной строке. Добавлен GitHub Actions workflow для compileall и unittest, но статус выполнения пока не получен. M2 ещё не завершён: тесты должны пройти, затем добавить/проверить durable runtime configuration and lifecycle; retrieval, provider adapter и связь журнала с игровым диалогом остаются следующими этапами.
 
 ## 8. Ограничения, которые сохраняются
 
