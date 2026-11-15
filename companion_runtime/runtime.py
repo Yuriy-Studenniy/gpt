@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""JSON-lines process API for the external AI Stalker Companion runtime.
+"""Внешний процесс Companion Runtime с API JSON-lines.
 
-The process owns the SQLite journal but does not import game bindings, make
-network calls, or invoke an LLM. One input JSON object produces one output
-JSON object carrying the same request_id.
+Процесс управляет журналом SQLite, но не загружает игровые модули, не обращается
+к сети и не вызывает LLM. На каждый входящий JSON-объект выдаётся один JSON-
+ответ с тем же request_id.
 """
 
 from __future__ import annotations
@@ -41,18 +41,18 @@ class CompanionRuntime:
         request_id: Optional[str] = None
         try:
             if not isinstance(request, dict):
-                raise JournalError("request must be a JSON object")
+                raise JournalError("запрос должен быть JSON-объектом")
             raw_id = request.get("request_id")
             if not isinstance(raw_id, str) or not raw_id.strip() or len(raw_id) > 160:
-                raise JournalError("request_id must be a non-empty string up to 160 characters")
+                raise JournalError("request_id должен быть непустой строкой длиной не более 160 символов")
             request_id = raw_id.strip()
 
             operation = request.get("op")
             if not isinstance(operation, str):
-                raise JournalError("op must be a string")
+                raise JournalError("op должен быть строкой")
             payload = request.get("payload", {})
             if not isinstance(payload, dict):
-                raise JournalError("payload must be a JSON object")
+                raise JournalError("payload должен быть JSON-объектом")
 
             if operation == "health":
                 result: Any = {
@@ -91,13 +91,13 @@ class CompanionRuntime:
                 integrity = self.journal.integrity_check()
                 result = {"integrity": integrity, "ok": integrity == ["ok"]}
             else:
-                raise JournalError(f"unsupported operation: {operation}")
+                raise JournalError(f"неподдерживаемая операция: {operation}")
 
             return {"request_id": request_id, "ok": True, "result": result}
         except (JournalError, TypeError, ValueError) as exc:
             return self._error(request_id, type(exc).__name__, str(exc))
         except Exception as exc:
-            # Do not terminate the long-lived process on one bad request.
+            # Одна ошибочная команда не должна завершать длительно работающий процесс.
             return self._error(request_id, "internal_error", str(exc))
 
 
@@ -106,18 +106,18 @@ def run_stdio(
     input_stream: TextIO = sys.stdin,
     output_stream: TextIO = sys.stdout,
 ) -> int:
-    """Serve newline-delimited JSON until stdin closes."""
+    """Обрабатывать JSON по одной строке до закрытия stdin."""
     for line_number, raw_line in enumerate(input_stream, start=1):
         if len(raw_line) > MAX_REQUEST_LINE:
             response = CompanionRuntime._error(
-                None, "request_too_large", f"line {line_number} exceeds size limit"
+                None, "request_too_large", f"строка {line_number} превышает допустимый размер"
             )
         else:
             try:
                 request = json.loads(raw_line)
             except json.JSONDecodeError as exc:
                 response = CompanionRuntime._error(
-                    None, "invalid_json", f"line {line_number}: {exc.msg}"
+                    None, "invalid_json", f"строка {line_number}: {exc.msg}"
                 )
             else:
                 response = runtime.handle_request(request)
@@ -135,14 +135,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--db",
         type=Path,
         default=Path("data") / "companion_memory.sqlite3",
-        help="SQLite journal path",
+        help="путь к файлу журнала SQLite",
     )
     args = parser.parse_args(argv)
     try:
         runtime = CompanionRuntime(args.db)
         return run_stdio(runtime)
     except (OSError, JournalError) as exc:
-        print(f"runtime_start_failed: {exc}", file=sys.stderr)
+        print(f"не удалось запустить Runtime: {exc}", file=sys.stderr)
         return 2
 
 
