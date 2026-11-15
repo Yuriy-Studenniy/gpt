@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Append-only SQLite journal for the external AI Stalker Companion runtime.
+"""Журнал AI Stalker Companion на SQLite с добавлением без перезаписи.
 
-This module deliberately has no game, network, or LLM dependencies. It is the
-durable storage boundary for M2; IPC and model-provider adapters are separate.
+Модуль намеренно не зависит от игры, сети или LLM. Это граница долговременного
+хранения этапа M2; IPC и адаптеры поставщиков моделей находятся отдельно.
 """
 
 from __future__ import annotations
@@ -27,11 +27,11 @@ ALLOWED_SPEAKERS = frozenset(
 
 
 class JournalError(ValueError):
-    """Base class for invalid journal operations."""
+    """Базовый класс ошибок при некорректных операциях с журналом."""
 
 
 class IdempotencyConflict(JournalError):
-    """A message ID was reused for a different immutable message."""
+    """ID сообщения повторно использован для другого неизменяемого сообщения."""
 
 
 @dataclass(frozen=True)
@@ -55,17 +55,17 @@ def utc_now() -> str:
 
 def _required_text(value: str, field: str, max_length: int = 4096) -> str:
     if not isinstance(value, str):
-        raise JournalError(f"{field} must be a string")
+        raise JournalError(f"поле {field} должно быть строкой")
     value = value.strip()
     if not value:
-        raise JournalError(f"{field} must not be empty")
+        raise JournalError(f"поле {field} не должно быть пустым")
     if len(value) > max_length:
-        raise JournalError(f"{field} exceeds {max_length} characters")
+        raise JournalError(f"поле {field} превышает лимит в {max_length} символов")
     return value
 
 
 class CompanionJournal:
-    """Small SQLite journal with immutable messages and ID-based idempotency."""
+    """Журнал SQLite с неизменяемыми сообщениями и идемпотентностью по ID."""
 
     def __init__(self, database_path: str | Path = DEFAULT_DATABASE) -> None:
         self.database_path = Path(database_path).expanduser()
@@ -135,7 +135,7 @@ class CompanionJournal:
             current_version = connection.execute("PRAGMA user_version").fetchone()[0]
             if current_version not in (0, SCHEMA_VERSION):
                 raise JournalError(
-                    f"Unsupported database schema version: {current_version}"
+                    f"Неподдерживаемая версия схемы базы данных: {current_version}"
                 )
             connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -170,18 +170,18 @@ class CompanionJournal:
         speaker = _required_text(speaker, "speaker", 40).lower()
         if speaker not in ALLOWED_SPEAKERS:
             raise JournalError(
-                "speaker must be one of: " + ", ".join(sorted(ALLOWED_SPEAKERS))
+                "speaker должен быть одним из значений: " + ", ".join(sorted(ALLOWED_SPEAKERS))
             )
         if not isinstance(content, str):
-            raise JournalError("content must be a string")
+            raise JournalError("content должен быть строкой")
         if len(content) > 200_000:
-            raise JournalError("content exceeds 200000 characters")
+            raise JournalError("content превышает лимит в 200000 символов")
         source = _required_text(source, "source", 160)
         message_id = _required_text(message_id if message_id is not None else uuid.uuid4().hex, "message_id", 160)
         if metadata is None:
             metadata = {}
         if not isinstance(metadata, dict):
-            raise JournalError("metadata must be a JSON object")
+            raise JournalError("metadata должен быть JSON-объектом")
         try:
             metadata_json = json.dumps(
                 metadata,
@@ -191,7 +191,7 @@ class CompanionJournal:
                 allow_nan=False,
             )
         except (TypeError, ValueError) as exc:
-            raise JournalError(f"metadata is not JSON serializable: {exc}") from exc
+            raise JournalError(f"metadata нельзя преобразовать в JSON: {exc}") from exc
         timestamp = _required_text(created_at, "created_at", 80) if created_at else utc_now()
 
         with self._connect() as connection:
@@ -211,7 +211,7 @@ class CompanionJournal:
                         or existing_conversation["scope_id"] != scope_id
                     ):
                         raise JournalError(
-                            f"conversation {conversation_id!r} does not belong to scope {scope_id!r}"
+                            f"беседа {conversation_id!r} не принадлежит области {scope_id!r}"
                         )
                     same_payload = (
                         existing["conversation_id"] == conversation_id
@@ -222,7 +222,7 @@ class CompanionJournal:
                     )
                     if not same_payload:
                         raise IdempotencyConflict(
-                            f"message_id {message_id!r} already belongs to a different payload"
+                            f"message_id {message_id!r} уже связан с другими данными"
                         )
                     connection.execute("COMMIT")
                     return self._record(existing, duplicate=True)
@@ -242,8 +242,8 @@ class CompanionJournal:
                     )
                 elif conversation["scope_id"] != scope_id:
                     raise JournalError(
-                        f"conversation {conversation_id!r} belongs to scope "
-                        f"{conversation['scope_id']!r}, not {scope_id!r}"
+                        f"беседа {conversation_id!r} принадлежит области "
+                        f"{conversation['scope_id']!r}, а не {scope_id!r}"
                     )
 
                 sequence = int(
@@ -305,12 +305,12 @@ class CompanionJournal:
     ) -> list[MessageRecord]:
         conversation_id = _required_text(conversation_id, "conversation_id", 160)
         if not isinstance(limit, int) or not 1 <= limit <= 500:
-            raise JournalError("limit must be an integer from 1 to 500")
+            raise JournalError("limit должен быть целым числом от 1 до 500")
         sql = "SELECT * FROM messages WHERE conversation_id = ?"
         params: list[Any] = [conversation_id]
         if before_sequence is not None:
             if not isinstance(before_sequence, int) or before_sequence < 1:
-                raise JournalError("before_sequence must be a positive integer")
+                raise JournalError("before_sequence должен быть положительным целым числом")
             sql += " AND sequence < ?"
             params.append(before_sequence)
         sql += " ORDER BY sequence DESC LIMIT ?"
@@ -377,7 +377,7 @@ def _main(argv: Optional[list[str]] = None) -> int:
         elif args.command == "append":
             metadata = json.loads(args.metadata_json)
             if not isinstance(metadata, dict):
-                raise JournalError("--metadata-json must contain a JSON object")
+                raise JournalError("--metadata-json должен содержать JSON-объект")
             result = journal.append_message(
                 conversation_id=args.conversation,
                 scope_id=args.scope,
@@ -397,7 +397,7 @@ def _main(argv: Optional[list[str]] = None) -> int:
             return 0 if results == ["ok"] else 1
         return 0
     except (JournalError, sqlite3.Error, OSError, json.JSONDecodeError) as exc:
-        print(f"journal_error: {exc}", file=sys.stderr)
+        print(f"ошибка_журнала: {exc}", file=sys.stderr)
         return 2
 
 
