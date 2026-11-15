@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""One-shot file IPC round-trip probe for S.T.A.L.K.E.R. CoP 1.6.02.
+"""Одноразовая проверка файлового обмена с S.T.A.L.K.E.R. CoP 1.6.02.
 
-The game-side Lua module accepts only: v1 <request_id> ping
-and responds: v1 <request_id> ok pong_gpt_companion_ipc_probe_v1
-No LLM, HTTP, sockets, or third-party Python packages are involved.
+Lua-обработчик игры принимает команду v1 <request_id> ping и возвращает
+v1 <request_id> ok pong_gpt_companion_ipc_probe_v1.
+LLM, HTTP, сокеты и сторонние Python-пакеты не используются.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ STATUS_NAME = "gpt_companion_ipc_status.txt"
 
 
 def resolve_app_data_root(game_root: Path) -> Path:
-    """Resolve $app_data_root$ from fsgame.ltx, using game_root as $fs_root$."""
+    """Получить путь $app_data_root$ из fsgame.ltx относительно $fs_root$ игры."""
     fsgame_path = game_root / "fsgame.ltx"
     if not fsgame_path.is_file():
         raise FileNotFoundError(f"Не найден fsgame.ltx: {fsgame_path}")
@@ -87,7 +87,7 @@ def resolve_app_data_root(game_root: Path) -> Path:
 
 
 def write_atomic(path_tmp: Path, path_final: Path, payload: str) -> None:
-    # Flush the writable descriptor before exposing the complete final file.
+    # Сбросить буфер записи до публикации готового командного файла.
     with path_tmp.open("w", encoding="ascii", newline="\n") as handle:
         handle.write(payload)
         handle.flush()
@@ -114,7 +114,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
         return 2
 
     try:
-        # Only stale staging data is disposable. Keep status/reply evidence.
+        # Можно удалить только устаревший временный файл. Диагностику и ответ сохраняем.
         command_tmp.unlink(missing_ok=True)
     except OSError as exc:
         print(f"Не удалось очистить временный файл команды: {exc}", file=sys.stderr)
@@ -149,12 +149,12 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
                         print(f"Игра вернула неожиданный ответ: {lines[0]}", file=sys.stderr)
                         return 1
         except OSError:
-            # A transient read/rename race should not fail the probe.
+            # Кратковременная гонка при чтении/переименовании не должна проваливать проверку.
             pass
         time.sleep(0.25)
 
-    # Do not delete our request on timeout: the game may have been paused while
-    # minimized and can still consume the command after it resumes.
+    # Не удалять команду по тайм-ауту: свёрнутая игра могла приостановиться
+    # и обработать её только после возвращения в активный режим.
     print("Тайм-аут ожидания ответа; запрос и диагностические файлы сохранены.", file=sys.stderr)
     print(f"request_id: {request_id}", file=sys.stderr)
     print(f"$app_data_root$: {app_data_root}", file=sys.stderr)
@@ -176,7 +176,7 @@ def run_probe(app_data_root: Path, timeout: float) -> int:
     return 1
 
 def configure_console_output() -> None:
-    """Avoid UnicodeEncodeError when Python runs inside a Windows PowerShell job."""
+    """Не допускать UnicodeEncodeError в фоновой задаче Windows PowerShell."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(errors="backslashreplace")
