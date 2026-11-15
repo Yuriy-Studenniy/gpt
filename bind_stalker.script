@@ -430,7 +430,6 @@ end
 local GPT_IPC_PROBE_POLL_MS = 500
 local GPT_IPC_PROBE_NEXT_POLL = 0
 local GPT_IPC_PROBE_DISABLED = false
-local GPT_IPC_PROBE_LAST_OPEN_ERROR = nil
 local GPT_IPC_PROBE_LAST_OPEN_STATUS_MS = nil
 local GPT_IPC_PROBE_CMD_PATH = nil
 local GPT_IPC_PROBE_REPLY_TMP_PATH = nil
@@ -589,9 +588,8 @@ local function gpt_companion_ipc_probe_update(now)
 	if file == nil then
 		local error_text = tostring(open_error or "unknown_io_error")
 		local status_due = GPT_IPC_PROBE_LAST_OPEN_STATUS_MS == nil
-			or type(now) == "number" and now - GPT_IPC_PROBE_LAST_OPEN_STATUS_MS >= 5000
-		if GPT_IPC_PROBE_LAST_OPEN_ERROR ~= error_text or status_due then
-			GPT_IPC_PROBE_LAST_OPEN_ERROR = error_text
+			or now - GPT_IPC_PROBE_LAST_OPEN_STATUS_MS >= 5000
+		if status_due then
 			GPT_IPC_PROBE_LAST_OPEN_STATUS_MS = now
 			gpt_ipc_probe_write_status(
 				"command_open_failed",
@@ -602,8 +600,9 @@ local function gpt_companion_ipc_probe_update(now)
 		end
 		return
 	end
-	GPT_IPC_PROBE_LAST_OPEN_ERROR = nil
-	GPT_IPC_PROBE_LAST_OPEN_STATUS_MS = nil
+	-- Keep the latest meaningful state visible for five seconds after a command
+	-- is found; the next empty poll must not immediately overwrite reply_written.
+	GPT_IPC_PROBE_LAST_OPEN_STATUS_MS = now
 
 	local read_ok, line = pcall(function()
 		local value = file:read("*l")
