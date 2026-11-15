@@ -1,8 +1,8 @@
--- Состояние смарттеррейна
--- Может быть трех видов: normal, danger, alarm
--- normal - все как обычно, без ограничений
--- danger - в зоне контроля находится игрок с оружием. Нужно запереть двери и предложить ему убираться
--- alarm - игрок атаковал смарт. Нужно запереть двери и подождать время.
+-- Г‘Г®Г±ГІГ®ГїГ­ГЁГҐ Г±Г¬Г Г°ГІГІГҐГ°Г°ГҐГ©Г­Г 
+-- ГЊГ®Г¦ГҐГІ ГЎГ»ГІГј ГІГ°ГҐГµ ГўГЁГ¤Г®Гў: normal, danger, alarm
+-- normal - ГўГ±ГҐ ГЄГ ГЄ Г®ГЎГ»Г·Г­Г®, ГЎГҐГ§ Г®ГЈГ°Г Г­ГЁГ·ГҐГ­ГЁГ©
+-- danger - Гў Г§Г®Г­ГҐ ГЄГ®Г­ГІГ°Г®Г«Гї Г­Г ГµГ®Г¤ГЁГІГ±Гї ГЁГЈГ°Г®ГЄ Г± Г®Г°ГіГ¦ГЁГҐГ¬. ГЌГіГ¦Г­Г® Г§Г ГЇГҐГ°ГҐГІГј Г¤ГўГҐГ°ГЁ ГЁ ГЇГ°ГҐГ¤Г«Г®Г¦ГЁГІГј ГҐГ¬Гі ГіГЎГЁГ°Г ГІГјГ±Гї
+-- alarm - ГЁГЈГ°Г®ГЄ Г ГІГ ГЄГ®ГўГ Г« Г±Г¬Г Г°ГІ. ГЌГіГ¦Г­Г® Г§Г ГЇГҐГ°ГҐГІГј Г¤ГўГҐГ°ГЁ ГЁ ГЇГ®Г¤Г®Г¦Г¤Г ГІГј ГўГ°ГҐГ¬Гї.
 
 NORMAL = 0
 DANGER = 1
@@ -28,6 +28,14 @@ function CBaseOnActorControl:__init(smart, ini, section)
 end
 
 function CBaseOnActorControl:update()
+	-- During save loading db.actor may not yet be assigned.
+	if db.actor == nil then
+		if current_smart_id == self.smart.id then
+			current_smart_id = nil
+		end
+		return
+	end
+
 	--printf("%s alarm status [%s]", self.smart:name(), self.status)
 
 	if self.status == ALARM then
@@ -38,7 +46,7 @@ function CBaseOnActorControl:update()
 
 		local sound = xr_logic.pick_section_from_condlist(db.actor, self.smart, self.alarm_stop_sound)
 		--printf("SOUND = %s", tostring(sound))
-		--' Озвучка на конец атаки
+		--' ГЋГ§ГўГіГ·ГЄГ  Г­Г  ГЄГ®Г­ГҐГ¶ Г ГІГ ГЄГЁ
 		if sound ~= nil then
 			xr_sound.set_sound_play(db.actor:id(), sound)
 		end
@@ -55,8 +63,15 @@ function CBaseOnActorControl:update()
 	end
 end
 
--- Возвращает статус угрожает ли игрок смарту или нет (находится ли с оружием в пределах новеапон зоны).
+-- Г‚Г®Г§ГўГ°Г Г№Г ГҐГІ Г±ГІГ ГІГіГ± ГіГЈГ°Г®Г¦Г ГҐГІ Г«ГЁ ГЁГЈГ°Г®ГЄ Г±Г¬Г Г°ГІГі ГЁГ«ГЁ Г­ГҐГІ (Г­Г ГµГ®Г¤ГЁГІГ±Гї Г«ГЁ Г± Г®Г°ГіГ¦ГЁГҐГ¬ Гў ГЇГ°ГҐГ¤ГҐГ«Г Гµ Г­Г®ГўГҐГ ГЇГ®Г­ Г§Г®Г­Г»).
 function CBaseOnActorControl:get_actor_treat()
+	if db.actor == nil then
+		if current_smart_id == self.smart.id then
+			current_smart_id = nil
+		end
+		return false
+	end
+
 	local zone = db.zone_by_name[self.noweap_zone]
 	if zone == nil then
 		return false
@@ -78,12 +93,16 @@ function CBaseOnActorControl:get_actor_treat()
 	return false
 end
 
--- Устанавливает, что игрок атаковал смарт
+-- Г“Г±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГІ, Г·ГІГ® ГЁГЈГ°Г®ГЄ Г ГІГ ГЄГ®ГўГ Г« Г±Г¬Г Г°ГІ
 function CBaseOnActorControl:actor_attack()
+	if db.actor == nil then
+		return
+	end
+
 
 	if self.status ~= ALARM then
 		local sound = xr_logic.pick_section_from_condlist(db.actor, self.smart, self.alarm_start_sound)
-		--' Озвучка на начало атаки.
+		--' ГЋГ§ГўГіГ·ГЄГ  Г­Г  Г­Г Г·Г Г«Г® Г ГІГ ГЄГЁ.
 		if sound ~= nil then
 			xr_sound.set_sound_play(db.actor:id(), sound)
 		end
@@ -99,7 +118,7 @@ function CBaseOnActorControl:get_status()
 	return self.status
 end
 
--- НЕ ЗАБЫТЬ СЕЙВ ЛОАД
+-- ГЌГ… Г‡ГЂГЃГ›Г’Гњ Г‘Г…Г‰Г‚ Г‹ГЋГЂГ„
 function CBaseOnActorControl:save(packet)
 	set_save_marker(packet, "save", false, "CBaseOnActorControl")
 
